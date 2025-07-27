@@ -38,6 +38,11 @@ class ConfigManager:
         # Ensure parent directory exists
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def config_path(self) -> Path:
+        """Get the configuration file path for backward compatibility."""
+        return self.path
+
     def _find_config_file(self) -> Path:
         """Find configuration file using Bash-compatible search hierarchy."""
         # 1. Look for project-level .giv/config (walk up directory tree)
@@ -161,8 +166,8 @@ class ConfigManager:
         
         return result
 
-    def get(self, key: str) -> Optional[str]:
-        """Retrieve value with precedence: environment > config file > None."""
+    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+        """Retrieve value with precedence: environment > config file > default."""
         # First check environment variables
         env_value = self._get_from_environment(key)
         if env_value is not None:
@@ -180,7 +185,7 @@ class ConfigManager:
         if normalized_key and normalized_key in config_data:
             return config_data[normalized_key]
         
-        return None
+        return default
 
     def set(self, key: str, value: str) -> None:
         """Set ``key`` to ``value`` in the configuration file."""

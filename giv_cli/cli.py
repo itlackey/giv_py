@@ -28,6 +28,16 @@ from .output_utils import write_output
 logger = logging.getLogger(__name__)
 
 
+def _add_common_args(parser):
+    """Add common arguments that can appear after subcommands."""
+    parser.add_argument("--verbose", action="store_true", help="Enable debug/trace output")  
+    parser.add_argument("--dry-run", action="store_true", help="Preview only; don't write any files")
+    parser.add_argument("--output-mode", type=str, choices=["auto", "prepend", "append", "update", "overwrite", "none"], 
+                       help="Output mode: auto, prepend, append, update, overwrite, none")
+    parser.add_argument("--output-file", type=str, help="Write the output to the specified file instead of stdout")
+    return parser
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser used for all commands.
 
@@ -72,16 +82,12 @@ Examples:
     parser.add_argument("--api-model", type=str, help="Remote model name (alias for --model)")
     parser.add_argument("--api-url", type=str, help="Remote API endpoint URL")
     parser.add_argument("--api-key", type=str, help="API key for remote mode")
-    parser.add_argument("--output-mode", type=str, choices=["auto", "prepend", "append", "update", "none"], 
-                       help="Output mode: auto, prepend, append, update, none")
+    parser.add_argument("--output-mode", type=str, choices=["auto", "prepend", "append", "update", "overwrite", "none"], 
+                       help="Output mode: auto, prepend, append, update, overwrite, none")
     parser.add_argument("--output-version", type=str, help="Version string for release content")
     parser.add_argument("--output-file", type=str, help="Write the output to the specified file instead of stdout")
     parser.add_argument("--prompt-file", type=str, help="Path to a custom prompt template file")
     parser.add_argument("--list", action="store_true", help="List available local models")
-    
-    # Support for positional revision and pathspec arguments
-    parser.add_argument("revision", nargs="?", help="Git revision or revision-range (HEAD, v1.2.3, abc123, HEAD~2..HEAD, origin/main...HEAD, --cached, --current)")
-    parser.add_argument("pathspec", nargs="*", help="Git pathspec to narrow scope—supports magic prefixes, negation (! or :(exclude)), and case-insensitive :(icase)")
 
     subparsers = parser.add_subparsers(dest="command", metavar="<command>", help="Available subcommands")
 
@@ -99,32 +105,38 @@ Examples:
     msg_parser = subparsers.add_parser("message", aliases=["msg"], help="Generate a commit message from the diff")
     msg_parser.add_argument("revision", nargs="?", default="--current", help="Revision range to analyze")
     msg_parser.add_argument("pathspec", nargs="*", help="Limit analysis to the specified paths")
+    _add_common_args(msg_parser)
 
     # summary command
     summary_parser = subparsers.add_parser("summary", help="Generate a summary of recent changes")
     summary_parser.add_argument("revision", nargs="?", default="--current", help="Revision range to summarize")
     summary_parser.add_argument("pathspec", nargs="*", help="Limit summary to the specified paths")
+    _add_common_args(summary_parser)
 
     # changelog command
     changelog_parser = subparsers.add_parser("changelog", help="Generate or update a changelog")
     changelog_parser.add_argument("revision", nargs="?", default="--current", help="Revision range for changelog")
     changelog_parser.add_argument("pathspec", nargs="*", help="Limit changelog to the specified paths")
+    _add_common_args(changelog_parser)
 
     # release-notes command
     release_parser = subparsers.add_parser("release-notes", help="Generate release notes for a tagged release")
     release_parser.add_argument("revision", nargs="?", default="--current", help="Revision range for release notes")
     release_parser.add_argument("pathspec", nargs="*", help="Limit release notes to the specified paths")
+    _add_common_args(release_parser)
 
     # announcement command
     announce_parser = subparsers.add_parser("announcement", help="Create a marketing-style announcement")
     announce_parser.add_argument("revision", nargs="?", default="--current", help="Revision range for announcement")
     announce_parser.add_argument("pathspec", nargs="*", help="Limit announcement to the specified paths")
+    _add_common_args(announce_parser)
 
     # document command
     doc_parser = subparsers.add_parser("document", help="Generate custom content using your own prompt template")
     doc_parser.add_argument("revision", nargs="?", default="--current", help="Revision range to document")
     doc_parser.add_argument("pathspec", nargs="*", help="Limit documentation to the specified paths")
     doc_parser.add_argument("--prompt-file", dest="prompt_file", required=True, help="Path to custom prompt template")
+    _add_common_args(doc_parser)
 
     # init command
     subparsers.add_parser("init", help="Initialize giv configuration")
@@ -244,41 +256,55 @@ def _apply_global_args(args: argparse.Namespace, cfg_mgr: ConfigManager) -> None
 
 def _run_config(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
     """Handle the ``config`` subcommand."""
-    # Handle different config operations based on flags and arguments
-    if args.list or (not args.get and not args.set and not args.unset and not args.key):
+    # Determine operation from flag-style arguments
+    operation = None
+    if args.list:
+        operation = "list"
+    elif args.get:
+        operation = "get"
+    elif args.set:
+        operation = "set"
+    elif args.unset:
+        operation = "unset"
+    
+    key = args.key
+    value = args.value
+    
+    # Handle different config operations
+    if operation == "list" or (not operation and not key):
         # List all configuration values
         items = cfg_mgr.list()
         for k, v in items.items():
             print(f"{k}={v}")
         return 0
-    elif args.get or (args.key and not args.value and not args.set and not args.unset):
+    elif operation == "get" or (key and not value and not operation):
         # Get a configuration value
-        if not args.key:
-            print("Error: key required for get operation", file=os.sys.stderr)
+        if not key:
+            print("Error: key required for get operation", file=sys.stderr)
             return 1
-        value = cfg_mgr.get(args.key)
-        if value is None:
-            print(f"{args.key} is not set", file=os.sys.stderr)
+        value_result = cfg_mgr.get(key)
+        if value_result is None:
+            print(f"{key} is not set", file=sys.stderr)
             return 1
         else:
-            print(value)
+            print(value_result)
             return 0
-    elif args.set or (args.key and args.value):
+    elif operation == "set" or (key and value):
         # Set a configuration value
-        if not args.key or not args.value:
-            print("Error: both key and value required for set operation", file=os.sys.stderr)
+        if not key or not value:
+            print("Error: both key and value required for set operation", file=sys.stderr)
             return 1
-        cfg_mgr.set(args.key, args.value)
+        cfg_mgr.set(key, value)
         return 0
-    elif args.unset:
+    elif operation == "unset":
         # Remove a configuration value
-        if not args.key:
-            print("Error: key required for unset operation", file=os.sys.stderr)
+        if not key:
+            print("Error: key required for unset operation", file=sys.stderr)
             return 1
-        cfg_mgr.unset(args.key)
+        cfg_mgr.unset(key)
         return 0
     else:
-        print("Error: Unknown config operation", file=os.sys.stderr)
+        print("Error: Unknown config operation", file=sys.stderr)
         return 1
 
 
