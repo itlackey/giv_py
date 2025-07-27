@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --no-root
+          pip install pyinstaller
+          pip install pytest
+
+      - name: Run tests
+        run: |
+          poetry run pytest -q
+
+      - name: Build executable
+        run: |
+          pyinstaller --name giv --onefile giv_cli/main.py
+
+      - name: Archive artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: giv-${{ matrix.os }}
+          path: dist/

@@ -1,0 +1,362 @@
+"""
+Project metadata extraction.
+
+This module provides comprehensive project metadata detection that matches
+the Bash implementation exactly, including:
+- Multi-language project type detection (Node.js, Python, Rust, Go, etc.)
+- Version file detection and parsing with custom patterns
+- Project URL and description extraction
+- Git-aware metadata extraction from specific commits
+- Metadata caching for performance
+- Configuration-based custom project types
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import re
+import subprocess
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, Optional, Union
+
+logger = logging.getLogger(__name__)
+
+
+class ProjectMetadata:
+    """Comprehensive project metadata detection matching Bash implementation."""
+    
+    _cache: Dict[str, Dict[str, str]] = {}
+    
+    @classmethod
+    def detect_project_type(cls, path: Optional[Path] = None) -> str:
+        """Detect project type based on files present, matching Bash detect_project_type.
+        
+        Parameters
+        ----------
+        path : Optional[Path]
+            Directory to check. Defaults to current working directory.
+            
+        Returns
+        -------
+        str
+            Project type: 'node', 'python', 'rust', 'go', 'php', 'gradle', 'maven', or 'custom'
+        """
+        if path is None:
+            path = Path.cwd()
+        
+        # Check files in priority order matching Bash implementation
+        if (path / "package.json").exists():
+            return "node"
+        elif (path / "pyproject.toml").exists():
+            return "python"
+        elif (path / "setup.py").exists():
+            return "python"
+        elif (path / "Cargo.toml").exists():
+            return "rust"
+        elif (path / "go.mod").exists():
+            return "go"
+        elif (path / "composer.json").exists():
+            return "php"
+        elif (path / "build.gradle").exists():
+            return "gradle"
+        elif (path / "pom.xml").exists():
+            return "maven"
+        else:
+            return "custom"
+
+    @classmethod
+    def get_file_content_at_commit(cls, file_path: str, commit: str = "HEAD") -> Optional[str]:
+        """Get file content at specific git commit, matching metadata_get_file_content."""
+        if commit in ("--current", "--cached", ""):
+            # Current working directory file
+            try:
+                return Path(file_path).read_text(encoding="utf-8")
+            except (FileNotFoundError, OSError):
+                return None
+        
+        # Get from git commit
+        try:
+            result = subprocess.run(
+                ["git", "show", f"{commit}:{file_path}"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if result.returncode == 0:
+                return result.stdout
+            return None
+        except (FileNotFoundError, subprocess.SubprocessError):
+            return None
+
+    @classmethod
+    def get_metadata_value(cls, key: str, commit: str = "HEAD", 
+                          project_type: Optional[str] = None) -> str:
+        """Get metadata value matching Bash get_metadata_value function.
+        
+        Parameters
+        ----------
+        key : str
+            Metadata key to retrieve ('title', 'name', 'version', etc.)
+        commit : str
+            Git commit to get metadata from
+        project_type : Optional[str]
+            Override project type detection
+            
+        Returns
+        -------
+        str
+            Metadata value or empty string if not found
+        """
+        # Auto-detect project type if not specified
+        if project_type is None:
+            project_type = os.environ.get("GIV_PROJECT_TYPE", "auto")
+            if project_type == "auto":
+                project_type = cls.detect_project_type()
+        
+        # Handle different project types matching Bash logic
+        if project_type == "node":
+            return cls._get_node_metadata(key, commit)
+        elif project_type == "python":
+            return cls._get_python_metadata(key, commit)
+        elif project_type == "rust":
+            return cls._get_rust_metadata(key, commit)
+        elif project_type == "go":
+            return cls._get_go_metadata(key, commit)
+        elif project_type == "custom":
+            return cls._get_custom_metadata(key, commit)
+        else:
+            return ""
+
+    @classmethod
+    def _get_node_metadata(cls, key: str, commit: str) -> str:
+        """Extract metadata from package.json."""
+        content = cls.get_file_content_at_commit("package.json", commit)
+        if not content:
+            return ""
+        
+        try:
+            data = json.loads(content)
+            value = data.get(key, "")
+            return str(value) if value is not None else ""
+        except (json.JSONDecodeError, KeyError):
+            # Fallback to awk-style parsing for malformed JSON
+            return cls._parse_json_like(content, key)
+
+    @classmethod
+    def _get_python_metadata(cls, key: str, commit: str) -> str:
+        """Extract metadata from pyproject.toml."""
+        content = cls.get_file_content_at_commit("pyproject.toml", commit)
+        if not content:
+            return ""
+        
+        try:
+            import tomllib
+            data = tomllib.loads(content)
+            
+            # Try PEP 621 project metadata first
+            project = data.get("project", {})
+            if key in project:
+                value = project[key]
+                return str(value) if value is not None else ""
+            
+            # Try Poetry metadata
+            poetry = data.get("tool", {}).get("poetry", {})
+            if key in poetry:
+                value = poetry[key]
+                return str(value) if value is not None else ""
+                
+            # Handle special key mappings
+            if key == "title" and "name" in project:
+                return str(project["name"])
+            elif key == "title" and "name" in poetry:
+                return str(poetry["name"])
+                
+            return ""
+        except Exception:
+            # Fallback to regex parsing for malformed TOML
+            return cls._parse_toml_like(content, key)
+
+    @classmethod
+    def _get_rust_metadata(cls, key: str, commit: str) -> str:
+        """Extract metadata from Cargo.toml."""
+        content = cls.get_file_content_at_commit("Cargo.toml", commit)
+        if not content:
+            return ""
+        
+        try:
+            import tomllib
+            data = tomllib.loads(content)
+            package = data.get("package", {})
+            value = package.get(key, "")
+            
+            # Handle special key mappings
+            if key == "title" and "name" in package:
+                return str(package["name"])
+            
+            return str(value) if value is not None else ""
+        except Exception:
+            return cls._parse_toml_like(content, key, section="package")
+
+    @classmethod
+    def _get_go_metadata(cls, key: str, commit: str) -> str:
+        """Extract metadata from go.mod and other Go project files."""
+        # For Go projects, try to get module name from go.mod
+        if key in ("name", "title"):
+            content = cls.get_file_content_at_commit("go.mod", commit)
+            if content:
+                # Extract module name from "module <name>" line
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith("module "):
+                        return line.split("module ", 1)[1].strip()
+        
+        return ""
+
+    @classmethod
+    def _get_custom_metadata(cls, key: str, commit: str) -> str:
+        """Extract metadata from custom version file."""
+        version_file = os.environ.get("GIV_PROJECT_VERSION_FILE", "version.txt")
+        content = cls.get_file_content_at_commit(version_file, commit)
+        if not content:
+            return ""
+        
+        # Parse custom format matching Bash awk logic
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            
+            # Case-insensitive matching
+            if re.search(rf'\b{re.escape(key)}\b', line, re.IGNORECASE):
+                # Look for key=value pattern
+                if "=" in line:
+                    parts = line.split("=", 1)
+                    if len(parts) == 2:
+                        value = parts[1].strip()
+                        # Remove quotes
+                        value = re.sub(r'^["\']|["\']$', '', value)
+                        return value
+        
+        return ""
+
+    @classmethod
+    def _parse_json_like(cls, content: str, key: str) -> str:
+        """Parse JSON-like content with regex fallback."""
+        pattern = rf'"{re.escape(key)}"\s*:\s*"([^"]+)"'
+        match = re.search(pattern, content)
+        return match.group(1) if match else ""
+
+    @classmethod
+    def _parse_toml_like(cls, content: str, key: str, section: str = "project") -> str:
+        """Parse TOML-like content with regex fallback."""
+        # Find section
+        in_section = False
+        for line in content.splitlines():
+            line = line.strip()
+            if line == f"[{section}]":
+                in_section = True
+                continue
+            elif line.startswith("[") and line.endswith("]"):
+                in_section = False
+                continue
+            
+            if in_section and "=" in line:
+                parts = line.split("=", 1)
+                if len(parts) == 2 and parts[0].strip() == key:
+                    value = parts[1].strip()
+                    # Remove quotes
+                    value = re.sub(r'^["\']|["\']$', '', value)
+                    return value
+        
+        return ""
+
+    @staticmethod
+    def get_title(commit: str = "HEAD") -> str:
+        """Return a human friendly title for the current project."""
+        # Try to get title/name from project metadata
+        title = ProjectMetadata.get_metadata_value("title", commit)
+        if title:
+            return title
+        
+        title = ProjectMetadata.get_metadata_value("name", commit)
+        if title:
+            return title
+        
+        # Fallback to directory name
+        return Path.cwd().name
+
+    @staticmethod
+    def get_version(commit: str = "HEAD") -> str:
+        """Return the project version if it can be determined."""
+        version = ProjectMetadata.get_metadata_value("version", commit)
+        return version if version else "0.0.0"
+
+    @staticmethod
+    def get_description(commit: str = "HEAD") -> str:
+        """Return the project description if available."""
+        return ProjectMetadata.get_metadata_value("description", commit)
+
+    @staticmethod
+    def get_url(commit: str = "HEAD") -> str:
+        """Return the project URL if available."""
+        # Try common URL fields
+        url = ProjectMetadata.get_metadata_value("homepage", commit)
+        if url:
+            return url
+        
+        url = ProjectMetadata.get_metadata_value("url", commit)
+        if url:
+            return url
+        
+        return ProjectMetadata.get_metadata_value("repository", commit)
+
+    @staticmethod
+    def get_author(commit: str = "HEAD") -> str:
+        """Return the project author if available."""
+        return ProjectMetadata.get_metadata_value("author", commit)
+
+    @classmethod
+    @lru_cache(maxsize=128)
+    def get_all_metadata(cls, commit: str = "HEAD") -> Dict[str, str]:
+        """Get all available project metadata as a dictionary.
+        
+        This method is cached for performance.
+        """
+        project_type = cls.detect_project_type()
+        
+        metadata = {
+            "project_type": project_type,
+            "title": cls.get_title(commit),
+            "name": cls.get_metadata_value("name", commit),
+            "version": cls.get_version(commit),
+            "description": cls.get_description(commit),
+            "url": cls.get_url(commit),
+            "author": cls.get_author(commit),
+        }
+        
+        # Add project-type specific metadata
+        if project_type == "node":
+            metadata.update({
+                "license": cls.get_metadata_value("license", commit),
+                "main": cls.get_metadata_value("main", commit),
+            })
+        elif project_type == "python":
+            metadata.update({
+                "license": cls.get_metadata_value("license", commit),
+                "requires_python": cls.get_metadata_value("requires-python", commit),
+            })
+        elif project_type == "rust":
+            metadata.update({
+                "license": cls.get_metadata_value("license", commit),
+                "edition": cls.get_metadata_value("edition", commit),
+            })
+        
+        return metadata
+
+    @classmethod
+    def clear_cache(cls):
+        """Clear the metadata cache."""
+        cls.get_all_metadata.cache_clear()
+        cls._cache.clear()
