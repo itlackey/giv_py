@@ -180,7 +180,7 @@ def run_command(args: argparse.Namespace) -> int:
         build_parser().print_help()
         return 0
     if args.version and not args.command:
-        print(__version__)
+        print(f"giv {__version__}")
         return 0
 
     # Default to message command if no command specified
@@ -218,7 +218,7 @@ def run_command(args: argparse.Namespace) -> int:
     elif args.command == "init":
         return _run_init(args, cfg_mgr)
     elif args.command == "version":
-        print(__version__)
+        print(f"giv {__version__}")
         return 0
     elif args.command == "help":
         # Delegate help to specific command if provided
@@ -269,6 +269,11 @@ def _run_config(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
     
     key = args.key
     value = args.value
+    
+    # Handle "show" as an alias for "list"
+    if key == "show":
+        operation = "list"
+        key = None
     
     # Handle different config operations
     if operation == "list" or (not operation and not key):

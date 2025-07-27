@@ -77,17 +77,26 @@ class ConfigManager:
         return env_key
 
     def _quote_value(self, value: str) -> str:
-        """Quote value if it contains spaces, special characters, or is empty."""
-        if not value or " " in value or any(c in value for c in ['"', "'", '`', '$', '\\']):
-            return f'"{value}"'
-        return value
+        """Quote a configuration value if necessary."""
+        # Don't quote simple values without special characters
+        if not any(char in value for char in [' ', '"', "'", '\n', '\t', '=']):
+            return value
+        
+        # Use double quotes for values with special characters
+        # Escape existing double quotes and preserve newlines as literal \n
+        escaped = value.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+        return f'"{escaped}"'
 
     def _unquote_value(self, value: str) -> str:
-        """Remove surrounding quotes from value."""
+        """Remove surrounding quotes from value and handle escape sequences."""
         value = value.strip()
         if ((value.startswith('"') and value.endswith('"')) or 
             (value.startswith("'") and value.endswith("'"))):
-            return value[1:-1]
+            unquoted = value[1:-1]
+            # Handle escape sequences in double-quoted strings
+            if value.startswith('"'):
+                unquoted = unquoted.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+            return unquoted
         return value
 
     def _parse_config_file(self) -> Dict[str, str]:
@@ -129,14 +138,51 @@ class ConfigManager:
         return None
 
     def _write_config_file(self, data: Dict[str, str]) -> None:
-        """Write the configuration dictionary back to disk."""
+        """Write the configuration dictionary back to disk, preserving comments."""
         lines = []
-        for key, value in sorted(data.items()):
-            quoted_value = self._quote_value(value)
-            lines.append(f"{key}={quoted_value}")
         
+        # Try to preserve existing structure if file exists
+        existing_lines = []
+        if self.path.exists():
+            try:
+                existing_lines = self.path.read_text(encoding="utf-8").splitlines()
+            except Exception:
+                pass
+        
+        # Keep track of which keys we've written
+        written_keys = set()
+        
+        # First pass: process existing lines, updating values as needed
+        for line in existing_lines:
+            stripped = line.strip()
+            
+            # Preserve comments and empty lines
+            if not stripped or stripped.startswith("#"):
+                lines.append(line)
+                continue
+            
+            # Process existing key-value pairs
+            if "=" in stripped:
+                key = stripped.split("=", 1)[0].strip()
+                if key in data:
+                    # Update existing key with new escaped value
+                    quoted_value = self._quote_value(data[key])
+                    lines.append(f"{key}={quoted_value}")
+                    written_keys.add(key)
+                # If key not in data, skip the line (effectively removing it)
+            else:
+                # Keep malformed lines as-is
+                lines.append(line)
+        
+        # Second pass: add any new keys that weren't in the original file
+        for key, value in sorted(data.items()):
+            if key not in written_keys:
+                quoted_value = self._quote_value(value)
+                lines.append(f"{key}={quoted_value}")
+        
+        # Write the result
         content = "\n".join(lines)
-        if content:
+        if content and not content.endswith("\n"):
             content += "\n"
         
         self.path.write_text(content, encoding="utf-8")
@@ -193,17 +239,23 @@ class ConfigManager:
             raise ValueError(f"Invalid key format: {key}")
         
         config_data = self._parse_config_file()
-        
-        # Always store in normalized GIV_* format for consistency
         normalized_key = self._normalize_key(key)
-        if normalized_key:
-            # Remove any existing entries for this key (both formats)
-            config_data.pop(key, None)
-            config_data.pop(normalized_key, None)
-            # Set the normalized version
+        
+        # Preserve existing key format if present, otherwise use normalized format
+        if key in config_data:
+            # Key exists in dot notation - preserve the format
+            config_data.pop(normalized_key, None)  # Remove normalized version if it exists
+            config_data[key] = value
+        elif normalized_key and normalized_key in config_data:
+            # Key exists in normalized format - preserve that format
+            config_data.pop(key, None)  # Remove dot notation version if it exists
             config_data[normalized_key] = value
         else:
-            config_data[key] = value
+            # New key - use normalized format for consistency
+            if normalized_key:
+                config_data[normalized_key] = value
+            else:
+                config_data[key] = value
         
         self._write_config_file(config_data)
 

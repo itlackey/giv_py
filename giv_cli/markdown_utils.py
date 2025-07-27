@@ -344,3 +344,210 @@ class MarkdownProcessor:
             
         print(f"DEBUG: append_link: Appended link: {link} to {file_path}", file=sys.stderr)
         return True
+
+    def extract_content(self, content: str, section_name: str) -> str:
+        """Extract content from a specific section in markdown."""
+        lines = content.splitlines()
+        section_found = False
+        section_lines = []
+        current_level = None
+        
+        for line in lines:
+            # Check if this is a header
+            if line.strip().startswith('#'):
+                header_level = len(line) - len(line.lstrip('#'))
+                header_text = line.lstrip('#').strip()
+                
+                if header_text.lower() == section_name.lower():
+                    section_found = True
+                    current_level = header_level
+                    continue
+                elif section_found:
+                    # If we find another header at the same or higher level, stop
+                    if header_level <= current_level:
+                        break
+            
+            # Add lines if we're in the target section
+            if section_found:
+                section_lines.append(line)
+        
+        return '\n'.join(section_lines).strip()
+
+    def generate_toc(self, content: str) -> str:
+        """Generate a table of contents from markdown headers."""
+        lines = content.splitlines()
+        toc_lines = []
+        
+        for line in lines:
+            if line.strip().startswith('#'):
+                header_level = len(line) - len(line.lstrip('#'))
+                header_text = line.lstrip('#').strip()
+                
+                # Create anchor link (convert to lowercase, replace spaces with hyphens)
+                anchor = header_text.lower().replace(' ', '-').replace('/', '').replace('?', '').replace('!', '')
+                anchor = re.sub(r'[^\w\-]', '', anchor)
+                
+                # Create indentation based on header level
+                indent = '  ' * (header_level - 1)
+                toc_line = f"{indent}- [{header_text}](#{anchor})"
+                toc_lines.append(toc_line)
+        
+        return '\n'.join(toc_lines)
+
+    def fix_relative_links(self, content: str, base_path: str) -> str:
+        """Fix relative links in markdown content."""
+        base_path = Path(base_path)
+        
+        # Pattern to match markdown links: [text](url)
+        link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+        
+        def fix_link(match):
+            text = match.group(1)
+            url = match.group(2)
+            
+            # Skip absolute URLs (http/https/ftp/mailto)
+            if re.match(r'^(https?|ftp|mailto):', url):
+                return match.group(0)
+            
+            # Skip anchor links
+            if url.startswith('#'):
+                return match.group(0)
+            
+            # Convert relative path to absolute
+            if not url.startswith('/'):
+                fixed_url = (base_path / url).resolve()
+                return f'[{text}]({fixed_url})'
+            
+            return match.group(0)
+        
+        return re.sub(link_pattern, fix_link, content)
+
+    def manage_sections(self, content: str, section_name: str, new_content: str, action: str) -> str:
+        """Manage sections in markdown content (replace, append, etc.)."""
+        lines = content.splitlines()
+        result_lines = []
+        section_found = False
+        current_level = None
+        section_start = None
+        section_end = None
+        
+        # Find the section
+        for i, line in enumerate(lines):
+            if line.strip().startswith('#'):
+                header_level = len(line) - len(line.lstrip('#'))
+                header_text = line.lstrip('#').strip()
+                
+                if header_text.lower() == section_name.lower():
+                    section_found = True
+                    current_level = header_level
+                    section_start = i
+                    continue
+                elif section_found:
+                    # If we find another header at the same or higher level, end section
+                    if header_level <= current_level:
+                        section_end = i
+                        break
+        
+        if not section_found:
+            # Section doesn't exist, add it at the end
+            if action in ['replace', 'append']:
+                result_lines = lines[:]
+                if result_lines and result_lines[-1].strip():
+                    result_lines.append('')
+                result_lines.append(f'# {section_name}')
+                result_lines.append('')
+                result_lines.extend(new_content.splitlines())
+                return '\n'.join(result_lines)
+        else:
+            # Section exists
+            if section_end is None:
+                section_end = len(lines)
+            
+            result_lines = lines[:section_start]
+            
+            if action == 'replace':
+                result_lines.append(f'# {section_name}')
+                result_lines.append('')
+                result_lines.extend(new_content.splitlines())
+            elif action == 'append':
+                # Keep existing section and append new content
+                result_lines.extend(lines[section_start:section_end])
+                if result_lines and result_lines[-1].strip():
+                    result_lines.append('')
+                result_lines.extend(new_content.splitlines())
+            
+            # Add remaining content after the section
+            if section_end < len(lines):
+                if result_lines and result_lines[-1].strip():
+                    result_lines.append('')
+                result_lines.extend(lines[section_end:])
+        
+        return '\n'.join(result_lines)
+
+    def clean_markdown(self, content: str) -> str:
+        """Clean up markdown formatting issues."""
+        lines = content.splitlines()
+        cleaned_lines = []
+        in_code_block = False
+        
+        prev_line_blank = True
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # Track code block state
+            if stripped.startswith('```'):
+                in_code_block = not in_code_block
+                cleaned_lines.append(line)
+                prev_line_blank = False
+                continue
+            
+            # Don't modify lines inside code blocks
+            if in_code_block:
+                cleaned_lines.append(line)
+                prev_line_blank = False
+                continue
+            
+            # Remove multiple consecutive blank lines
+            if not stripped:
+                if prev_line_blank:
+                    continue
+                prev_line_blank = True
+            else:
+                prev_line_blank = False
+            
+            # Clean up header formatting
+            if stripped.startswith('#'):
+                # Ensure single space after # symbols
+                level = len(stripped) - len(stripped.lstrip('#'))
+                header_text = stripped.lstrip('#').strip()
+                # Normalize spaces in header text
+                header_text = re.sub(r'\s+', ' ', header_text)
+                line = '#' * level + ' ' + header_text
+            
+            # Clean up list formatting
+            elif re.match(r'^\s*[\-\*\+]\s+', line):
+                # Ensure consistent list formatting
+                indent_match = re.match(r'^(\s*)', line)
+                indent = indent_match.group(1) if indent_match else ''
+                list_content = re.sub(r'^(\s*[\-\*\+]\s+)', '- ', line.lstrip())
+                # Normalize spaces in list content
+                list_content = re.sub(r'\s+', ' ', list_content.rstrip())
+                line = indent + list_content
+            
+            # Clean up regular text lines (normalize multiple spaces)
+            else:
+                # Preserve leading whitespace but normalize internal spaces
+                leading_space = len(line) - len(line.lstrip())
+                if leading_space > 0:
+                    line = ' ' * leading_space + re.sub(r'\s+', ' ', line.lstrip().rstrip())
+                else:
+                    line = re.sub(r'\s+', ' ', line.strip())
+            
+            cleaned_lines.append(line)
+        
+        # Remove trailing blank lines
+        while cleaned_lines and not cleaned_lines[-1].strip():
+            cleaned_lines.pop()
+        
+        return '\n'.join(cleaned_lines)

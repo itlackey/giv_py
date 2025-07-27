@@ -56,8 +56,8 @@ class GitHistory:
         # Get the main diff
         diff_output = self._get_tracked_diff(revision, paths)
         
-        # Add untracked files if requested
-        if include_untracked:
+        # For --current revision, always include untracked files to match Bash behavior
+        if revision == "--current" or (revision is None and include_untracked):
             untracked_diff = self._get_untracked_diff(paths)
             if diff_output and untracked_diff:
                 diff_output = f"{diff_output}\n{untracked_diff}"
@@ -77,15 +77,19 @@ class GitHistory:
             # Default behavior - diff working tree against HEAD
             pass
         else:
-            # Specific commit - show changes in that commit
-            cmd.append(f"{revision}^!")
+            # Check if it's a commit range (contains ..)
+            if ".." in revision:
+                cmd.append(revision)
+            else:
+                # Specific commit - show changes in that commit
+                cmd.append(f"{revision}^!")
         
         # Add path specifications
         if paths:
             cmd.append("--")
             cmd.extend(paths)
         
-        return self._run_git_command(cmd)
+        return self._run_git_diff_command(cmd)
 
     def _get_untracked_diff(self, paths: Optional[List[str]] = None) -> str:
         """Get diff for untracked files matching Bash untracked file handling."""
@@ -112,13 +116,13 @@ class GitHistory:
             if not file_path.exists() or not file_path.is_file():
                 continue
             
+            # Use simpler diff command
             cmd = [
-                "git", "--no-pager", "diff", "--no-prefix", "--unified=0", 
-                "--no-color", "-b", "-w", "--minimal", "--compact-summary",
-                "--color-moved=no", "--no-index", "/dev/null", str(file_path)
+                "git", "--no-pager", "diff", "--no-prefix", "--unified=3", 
+                "--no-color", "--no-index", "/dev/null", str(file_path)
             ]
             
-            diff_output = self._run_git_command(cmd)
+            diff_output = self._run_git_diff_command(cmd)
             if diff_output:
                 untracked_diffs.append(diff_output)
         
@@ -278,6 +282,32 @@ class GitHistory:
                 logger.debug("Git command failed: %s, stderr: %s", " ".join(cmd), result.stderr.strip())
                 return ""
             return result.stdout
+        except FileNotFoundError:
+            # Git is not installed
+            logger.debug("git executable not found")
+            return ""
+
+    def _run_git_diff_command(self, cmd: List[str]) -> str:
+        """Run a git diff command with proper exit code handling.
+        
+        git diff commands return exit code 1 when there are differences,
+        which is normal and should not be treated as an error.
+        """
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=self.repo_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            # git diff returns 0=no differences, 1=differences found, 2+=error
+            if result.returncode in (0, 1):
+                return result.stdout
+            else:
+                logger.debug("Git diff command failed: %s, stderr: %s", " ".join(cmd), result.stderr.strip())
+                return ""
         except FileNotFoundError:
             # Git is not installed
             logger.debug("git executable not found")

@@ -144,9 +144,26 @@ def bash_giv_path() -> Path:
 class BashGivRunner:
     """Helper class to run Bash giv commands for comparison testing."""
     
-    def __init__(self, bash_path: Path, work_dir: Path):
+    def __init__(self, bash_path: Path = None, work_dir: Path = None, cwd: Path = None):
+        # Handle both old style (bash_path, work_dir) and new style (cwd=...)
+        if bash_path is None:
+            # Find bash giv path
+            possible_paths = [
+                Path("/home/founder3/code/github/giv-cli/giv/src/giv.sh"),
+                Path("../giv/src/giv.sh"),
+                Path("../../giv/src/giv.sh"),
+            ]
+            for path in possible_paths:
+                if path.exists():
+                    bash_path = path
+                    break
+            if bash_path is None:
+                raise FileNotFoundError("Could not find bash giv.sh")
+        
         self.bash_path = bash_path
-        self.work_dir = work_dir
+        self.work_dir = cwd if cwd is not None else work_dir
+        if self.work_dir is None:
+            self.work_dir = Path.cwd()
     
     def run(self, args: list, **kwargs) -> subprocess.CompletedProcess:
         """Run a Bash giv command."""
@@ -163,14 +180,21 @@ class BashGivRunner:
 @pytest.fixture
 def bash_giv(bash_giv_path: Path, git_repo: Path) -> BashGivRunner:
     """Create a runner for Bash giv commands."""
-    return BashGivRunner(bash_giv_path, git_repo)
+    return BashGivRunner(bash_path=bash_giv_path, work_dir=git_repo)
 
 
 class PythonGivRunner:
     """Helper class to run Python giv commands."""
     
-    def __init__(self, work_dir: Path):
-        self.work_dir = work_dir
+    def __init__(self, work_dir: Path = None, cwd: Path = None):
+        # Handle both work_dir and cwd arguments
+        if work_dir is None and cwd is None:
+            # Default to current directory if no arguments provided
+            self.work_dir = Path.cwd()
+        elif cwd is not None:
+            self.work_dir = cwd
+        else:
+            self.work_dir = work_dir
     
     def run(self, args: list, **kwargs) -> subprocess.CompletedProcess:
         """Run a Python giv command."""

@@ -49,7 +49,7 @@ class TestBashPythonCompatibility:
         bash_help = bash_result.stdout.lower()
         python_help = python_result.stdout.lower()
         
-        common_commands = ['summary', 'post', 'changelog', 'release-notes']
+        common_commands = ['summary', 'message', 'changelog', 'release-notes']
         for command in common_commands:
             assert command in bash_help
             assert command in python_help

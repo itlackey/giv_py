@@ -65,6 +65,10 @@ class LLMClient:
         self.max_tokens = max_tokens
         self.timeout = timeout
         self.retries = retries
+        
+        # For backward compatibility with tests
+        self.api_base = self.api_url
+        self.headers = self._build_headers()
 
     @staticmethod
     def _clean_quotes(value: str) -> str:
@@ -78,6 +82,18 @@ class LLMClient:
         if value.startswith("'") and value.endswith("'"):
             return value[1:-1]
         return value
+
+    def _build_headers(self) -> Dict[str, str]:
+        """Build HTTP headers for API requests."""
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "giv-cli/1.0.0"
+        }
+        
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        
+        return headers
 
     def generate(self, prompt: str, dry_run: bool = False) -> Dict[str, Any]:
         """Generate a response from the language model.

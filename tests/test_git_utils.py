@@ -89,10 +89,12 @@ class TestGitHistory:
         os.chdir(git_repo)
         
         try:
+            # Create directories first
+            os.makedirs(git_repo / "docs", exist_ok=True)
+            
             # Add changes in different directories
             (git_repo / "src" / "src_file.js").write_text("console.log('src');")
             (git_repo / "docs" / "doc_file.md").write_text("# Documentation")
-            os.makedirs(git_repo / "docs", exist_ok=True)
             
             gh = GitHistory()
             
