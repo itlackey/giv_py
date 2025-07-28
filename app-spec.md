@@ -28,6 +28,13 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 ### 2.2 Global Options (must appear before subcommand)
 | Option | Description | Default |
 |--------|-------------|---------|
+| `--config-file <file>` | Configuration file to load | `.giv/config` |
+| `--verbose` | Enable detailed logging output | false |
+| `--dry-run` | Preview mode - no file writes or API calls | false |
+
+### 2.3 Document Related Command Options (must appear after revision or pathspec)
+| Option | Description | Default |
+|--------|-------------|---------|
 | `--api-url <url>` | Remote API endpoint URL | None |
 | `--api-key <key>` | API authentication key (prefer environment variables) | None |
 | `--api-model <model>` | LLM model name | "default" |
@@ -35,20 +42,16 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 | `--output-mode <mode>` | Output mode: auto/prepend/append/update/overwrite/none | auto |
 | `--output-file <file>` | Write output to file instead of stdout | None |
 | `--output-version <version>` | Version string for versioned content | Auto-detected |
-| `--prompt-file <file>` | Custom prompt template file | None |
+| `--prompt-file <file>` | Custom prompt template file, required for document subcommand | None |
 | `--todo-files <pathspec>` | Files to scan for TODO items | `**/*` |
 | `--todo-pattern <regex>` | Regex pattern for TODO matching | `TODO\|FIXME\|XXX` |
 | `--version-file <pathspec>` | Files to inspect for version information | Project-specific |
 | `--version-pattern <regex>` | Regex pattern for version extraction | SemVer default |
-| `--config-file <file>` | Configuration file to load | `.giv/config` |
-| `--verbose` | Enable detailed logging output | false |
-| `--dry-run` | Preview mode - no file writes or API calls | false |
-| `--list` | List available local models | false |
 
 ## 3. Subcommands
 
 ### 3.1 Message Command (Default)
-**Usage**: `giv [options] [message] [revision] [pathspec...]`
+**Usage**: `giv [global options] [message] [revision] [pathspec...] [command options]`
 
 **Purpose**: Generate commit messages from Git diffs
 
@@ -69,7 +72,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - References specific files and changes when relevant
 
 ### 3.2 Summary Command
-**Usage**: `giv [options] summary [revision] [pathspec...]`
+**Usage**: `giv [options] summary [revision] [pathspec...] [command options]`
 
 **Purpose**: Create comprehensive technical summaries of changes
 
@@ -84,7 +87,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - Professional tone suitable for technical documentation
 
 ### 3.3 Changelog Command
-**Usage**: `giv [options] changelog [revision] [pathspec...]`
+**Usage**: `giv [options] changelog [revision] [pathspec...] [command options]`
 
 **Purpose**: Generate or update changelog files following Keep a Changelog standard
 
@@ -92,7 +95,8 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - Automatically detects project version from metadata files
 - Updates existing changelog sections or creates new entries
 - Follows conventional changelog structure (Added, Changed, Fixed, etc.)
-- Default output mode is `update` to replace version sections
+- Default output mode is `auto` to replace version sections or prepend a new section them if they do not
+- Supports [Unreleased] section for changes not associated with a release
 
 **Default Output File**: `CHANGELOG.md`
 
@@ -111,7 +115,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 ```
 
 ### 3.4 Release Notes Command
-**Usage**: `giv [options] release-notes [revision] [pathspec...]`
+**Usage**: `giv [options] release-notes [revision] [pathspec...] [command options]`
 
 **Purpose**: Generate professional release notes for tagged releases
 
@@ -121,12 +125,12 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - Professional tone suitable for public release announcements
 - Default output mode is `overwrite` to replace entire file
 
-**Default Output File**: `RELEASE_NOTES.md`
+**Default Output File**: `RELEASE_NOTES_{VERSION}.md`
 
 **Output**: Professional release notes with version highlights and changes
 
 ### 3.5 Announcement Command
-**Usage**: `giv [options] announcement [revision] [pathspec...]`
+**Usage**: `giv [options] announcement [revision] [pathspec...] [command options]`
 
 **Purpose**: Create marketing-style announcements and public communications
 
@@ -136,12 +140,12 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - Suitable for blog posts, social media, and public announcements
 - Marketing-oriented language and structure
 
-**Default Output File**: `ANNOUNCEMENT.md`
+**Default Output File**: `ANNOUNCEMENT_{VERSION}.md`
 
 **Output**: Engaging announcement content with marketing focus
 
 ### 3.6 Document Command
-**Usage**: `giv [options] document --prompt-file <template> [revision] [pathspec...]`
+**Usage**: `giv [options] document [revision] [pathspec...] --prompt-file <template> [command options]`
 
 **Purpose**: Generate custom content using user-provided templates
 
@@ -156,6 +160,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 
 ### 3.7 Config Command
 **Usage**: `giv config <operation> [key] [value]`
+- CLI options/args matches `git config` for configuration operations
 
 **Operations**:
 - `list`: Display all configuration values
@@ -173,7 +178,9 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - `output.mode`: Default output mode
 - `project.title`: Project title override
 - `changelog.file`: Changelog filename
-- `release_notes.file`: Release notes filename
+- `todo.file`: Pathspec to search for TODO items
+- `todo.pattern`: RegEx pattern to locate TODO items
+- Also supports version file and pattern
 
 ### 3.8 Init Command
 **Usage**: `giv init`
@@ -196,9 +203,9 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 
 ### 4.1 Configuration Hierarchy (precedence from highest to lowest)
 1. **Command-line arguments**: Override all other settings
-2. **Environment variables**: `GIV_*` prefixed (e.g., `GIV_API_KEY`)
-3. **Project configuration**: `.giv/config` in project root
-4. **User configuration**: `~/.giv/config` in home directory  
+2. **Project configuration**: `.giv/config` in project root
+3. **User configuration**: `~/.giv/config` in home directory  
+4. **Environment variables**: `GIV_*` prefixed (e.g., `GIV_API_KEY`)
 5. **Built-in defaults**: Application defaults
 
 ### 4.2 Configuration File Format
@@ -206,7 +213,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 # Key-value pairs with dot notation
 api.url=https://api.openai.com/v1/chat/completions
 api.model=gpt-4
-api.key="your-api-key-here"
+api.key="ENV varibale key" # This sets what ENV var to use, DO NOT store keys in config
 output.mode=auto
 temperature=0.8
 max_tokens=8192
@@ -240,8 +247,8 @@ Templates support variable substitution with `{VARIABLE}` syntax:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `{SUMMARY}` | Git diff content | Unified diff output |
-| `{HISTORY}` | Alias for SUMMARY | Same as SUMMARY |
+| `{SUMMARY}` | LLM generated summary of Git diff content | Produced for each commit |
+| `{HISTORY}` |Git diff content | Unified diff output |
 | `{PROJECT_TITLE}` | Project name | "My Application" |
 | `{VERSION}` | Version string | "1.2.0" |
 | `{OUTPUT_VERSION}` | Specified output version | "1.2.0" |
@@ -293,7 +300,7 @@ Automatically detects project information from:
 
 ### 7.1 Output Modes
 - **`auto`**: Intelligent mode selection:
-  - Changelog command: `update`
+  - Changelog command: `update` or `prepend` if the section is missing
   - Release notes command: `overwrite`
   - Other commands: `none` (stdout)
 - **`prepend`**: Add content to beginning of file
@@ -303,7 +310,6 @@ Automatically detects project information from:
 - **`none`**: Output to stdout only
 
 ### 7.2 File Handling
-- **Backup creation**: Automatic backup before file modification
 - **Section management**: Version-aware updates for structured files
 - **Format preservation**: Maintains existing file structure and formatting
 - **Encoding**: UTF-8 encoding throughout application
