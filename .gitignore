@@ -22,3 +22,4 @@ dist/
 .env
 CLAUDE.md
 .giv
+.giv/config
