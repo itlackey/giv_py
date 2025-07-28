@@ -18,3 +18,7 @@ dist/
 .vscode/
 .idea/
 .remove/
+.notes/
+.env
+CLAUDE.md
+.giv
