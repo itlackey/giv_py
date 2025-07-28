@@ -26,6 +26,7 @@ def mock_config_manager():
     """Create a mock ConfigManager for testing."""
     config = Mock()
     config.get.return_value = None
+    config.list.return_value = {}
     config.list_all.return_value = {}
     config.set.return_value = None
     config.unset.return_value = None
@@ -331,12 +332,16 @@ class TestConfigCommandIntegration:
     
     def test_config_command_list_all(self, basic_args, mock_config_manager):
         """Test config command list all values."""
-        mock_config_manager.list_all.return_value = {
+        mock_config_manager.list.return_value = {
             "api.url": "http://localhost:11434",
             "api.model": "llama3.2"
         }
         
-        basic_args.action = "list"
+        # Set flag-style attributes for config command
+        basic_args.list = True
+        basic_args.get = False
+        basic_args.set = False
+        basic_args.unset = False
         basic_args.key = None
         basic_args.value = None
         
@@ -344,13 +349,17 @@ class TestConfigCommandIntegration:
         result = cmd.run()
         
         assert result == 0
-        mock_config_manager.list_all.assert_called_once()
+        mock_config_manager.list.assert_called_once()
     
     def test_config_command_get_value(self, basic_args, mock_config_manager, capsys):
         """Test config command get specific value."""
         mock_config_manager.get.return_value = "test_value"
         
-        basic_args.action = "get"
+        # Set flag-style attributes for config command
+        basic_args.list = False
+        basic_args.get = True
+        basic_args.set = False
+        basic_args.unset = False
         basic_args.key = "api.url"
         basic_args.value = None
         
@@ -363,7 +372,11 @@ class TestConfigCommandIntegration:
     
     def test_config_command_set_value(self, basic_args, mock_config_manager):
         """Test config command set value."""
-        basic_args.action = "set"
+        # Set flag-style attributes for config command
+        basic_args.list = False
+        basic_args.get = False
+        basic_args.set = True
+        basic_args.unset = False
         basic_args.key = "api.url"
         basic_args.value = "http://new-url:11434"
         
@@ -373,11 +386,18 @@ class TestConfigCommandIntegration:
         assert result == 0
         mock_config_manager.set.assert_called_once_with("api.url", "http://new-url:11434")
     
-    def test_config_command_unset_value(self, basic_args, mock_config_manager, capsys):
+    def test_config_command_unset_value(self, basic_args, mock_config_manager):
         """Test config command unset value."""
-        basic_args.action = "unset"
+        # Set flag-style attributes for config command
+        basic_args.list = False
+        basic_args.get = False
+        basic_args.set = False
+        basic_args.unset = True
         basic_args.key = "api.url"
         basic_args.value = None
+        
+        # Mock unset to not raise any errors
+        mock_config_manager.unset.return_value = None
         
         cmd = ConfigCommand(basic_args, mock_config_manager)
         result = cmd.run()
@@ -385,12 +405,16 @@ class TestConfigCommandIntegration:
         assert result == 0
         mock_config_manager.unset.assert_called_once_with("api.url")
     
-    def test_config_command_invalid_action(self, basic_args, mock_config_manager):
-        """Test config command with invalid action."""
-        # Since invalid action defaults to list, mock list_all properly
-        mock_config_manager.list_all.return_value = {"api.url": "http://localhost:11434"}
+    def test_config_command_default_list(self, basic_args, mock_config_manager):
+        """Test config command defaults to list when no operation specified."""
+        # Since no operation defaults to list, mock list properly
+        mock_config_manager.list.return_value = {"api.url": "http://localhost:11434"}
         
-        basic_args.action = None  # This will trigger default behavior (list)
+        # No flags set - should default to list
+        basic_args.list = False
+        basic_args.get = False
+        basic_args.set = False
+        basic_args.unset = False
         basic_args.key = None
         basic_args.value = None
         
