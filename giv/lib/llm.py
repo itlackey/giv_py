@@ -1,9 +1,9 @@
 """
 Language Model API client and utilities.
 
-This module provides comprehensive LLM integration that matches the Bash
-implementation exactly, including:
-- Support for multiple API formats (OpenAI ChatCompletion, Ollama, Generic)
+This module provides comprehensive LLM integration using the OpenAI ChatCompletion 
+format for all API endpoints, including:
+- Support for unified API format (OpenAI ChatCompletion)
 - Comprehensive error handling and retries
 - Proper dry-run mode implementation
 - Temperature and context window configuration
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """Enhanced language model client matching Bash implementation.
+    """Unified language model client using OpenAI ChatCompletion format.
     
     This class provides a normalized interface to various LLM APIs,
     with comprehensive error handling and configuration options.
@@ -156,10 +156,10 @@ class LLMClient:
         # Prepare request data
         headers = {"Content-Type": "application/json"}
         
-        # Check if we need authorization header (skip for localhost/Ollama)
+        # Check if we need authorization header (skip for localhost)
         needs_auth = (
             self.api_key
-            and self.api_key not in ("ollama", "giv")
+            and self.api_key not in ("giv",)
             and self.api_url
             and "localhost" not in self.api_url
             and "127.0.0.1" not in self.api_url
@@ -229,10 +229,6 @@ class LLMClient:
                     # Legacy completion format: choices[0].text
                     if "text" in first_choice:
                         return str(first_choice["text"])
-
-        # Ollama format
-        if "response" in response_data:
-            return str(response_data["response"])
 
         # Generic content key
         if "content" in response_data:

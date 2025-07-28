@@ -4,8 +4,7 @@ Comprehensive tests for lib.llm module.
 Tests LLM client functionality including API communication, error handling,
 and different model configurations.
 """
-import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import pytest
 import requests
 
@@ -63,148 +62,12 @@ class TestLLMClientInit:
         assert client.max_tokens == 32000
 
 
-@pytest.mark.skip(reason="LLMClient._detect_api_type() method no longer exists")
-class TestLLMClientAPIDetection:
-    """Test API type detection."""
-    
-    def test_detect_api_type_ollama(self):
-        """Test detecting Ollama API."""
-        client = LLMClient(api_url="http://localhost:11434")
-        assert client._detect_api_type() == "ollama"
-        
-        client = LLMClient(api_url="http://localhost:11434/")
-        assert client._detect_api_type() == "ollama"
-        
-        client = LLMClient(api_url="http://192.168.1.100:11434/api/generate")
-        assert client._detect_api_type() == "ollama"
-    
-    def test_detect_api_type_openai(self):
-        """Test detecting OpenAI API."""
-        client = LLMClient(api_url="https://api.openai.com/v1/chat/completions")
-        assert client._detect_api_type() == "openai"
-        
-        client = LLMClient(api_url="https://api.openai.com/v1")
-        assert client._detect_api_type() == "openai"
-        
-        # Custom OpenAI-compatible endpoints
-        client = LLMClient(api_url="https://api.anthropic.com/v1/chat/completions")
-        assert client._detect_api_type() == "openai"
-    
-    def test_detect_api_type_none(self):
-        """Test API type detection with no URL."""
-        client = LLMClient()
-        assert client._detect_api_type() == "ollama"  # Default
-    
-    def test_detect_api_type_unknown(self):
-        """Test detecting unknown API type."""
-        client = LLMClient(api_url="https://custom-api.example.com/generate")
-        # Should default to openai for unknown HTTPS endpoints
-        assert client._detect_api_type() == "openai"
-
-
-class TestLLMClientOllamaAPI:
-    """Test Ollama API functionality."""
+class TestLLMClientAPIGeneration:
+    """Test LLM API functionality."""
     
     @patch('requests.post')
-    def test_generate_ollama_success(self, mock_post):
-        """Test successful Ollama API generation."""
-        # Mock successful response
-        mock_response = Mock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {
-            "response": "Generated text from Ollama",
-            "done": True
-        }
-        mock_post.return_value = mock_response
-        
-        client = LLMClient(
-            api_url="http://localhost:11434",
-            model="llama3.2"
-        )
-        
-        result = client.generate("Test prompt")
-        
-        assert result["content"] == "Generated text from Ollama"
-        # Note: success key is not returned by current implementation
-        
-        # Verify request
-        mock_post.assert_called_once()
-        call_args = mock_post.call_args
-        assert call_args[0][0] == "http://localhost:11434"  # Direct URL call
-        
-        request_data = call_args[1]["json"]  # Implementation uses json= parameter
-        assert request_data["model"] == "llama3.2"
-        assert request_data["messages"] == [{"role": "user", "content": "Test prompt"}]
-        assert request_data["temperature"] == DEFAULT_TEMPERATURE
-        assert request_data["max_completion_tokens"] == DEFAULT_MAX_TOKENS
-    
-    @patch('requests.post')
-    def test_generate_ollama_with_options(self, mock_post):
-        """Test Ollama API with custom options."""
-        mock_response = Mock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {
-            "response": "Generated text",
-            "done": True
-        }
-        mock_post.return_value = mock_response
-        
-        client = LLMClient(
-            api_url="http://localhost:11434",
-            model="llama3.2",
-            temperature=0.8,
-            max_tokens=2048
-        )
-        
-        result = client.generate("Test prompt")
-        
-        # Verify options are passed in OpenAI format
-        request_data = mock_post.call_args[1]["json"]
-        assert request_data["temperature"] == 0.8
-        assert request_data["max_completion_tokens"] == 2048
-    
-    @patch('requests.post')
-    def test_generate_ollama_request_error(self, mock_post):
-        """Test Ollama API request error."""
-        mock_post.side_effect = requests.RequestException("Connection failed")
-        
-        client = LLMClient(api_url="http://localhost:11434")
-        
-        with pytest.raises(APIError, match="API error: Connection failed"):
-            client.generate("Test prompt")
-    
-    @patch('requests.post')
-    def test_generate_ollama_http_error(self, mock_post):
-        """Test Ollama API HTTP error."""
-        mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
-        mock_post.return_value = mock_response
-        
-        client = LLMClient(api_url="http://localhost:11434")
-        
-        with pytest.raises(APIError, match="API error: 404 Not Found"):
-            client.generate("Test prompt")
-    
-    @patch('requests.post')
-    def test_generate_ollama_invalid_json(self, mock_post):
-        """Test Ollama API invalid JSON response."""
-        mock_response = Mock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "doc", 0)
-        mock_post.return_value = mock_response
-        
-        client = LLMClient(api_url="http://localhost:11434")
-        
-        with pytest.raises(APIError, match="API error: Invalid JSON response"):
-            client.generate("Test prompt")
-
-
-class TestLLMClientOpenAIAPI:
-    """Test OpenAI API functionality."""
-    
-    @patch('requests.post')
-    def test_generate_openai_success(self, mock_post):
-        """Test successful OpenAI API generation."""
+    def test_generate_success(self, mock_post):
+        """Test successful API generation."""
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {
@@ -243,8 +106,8 @@ class TestLLMClientOpenAIAPI:
         assert request_data["max_completion_tokens"] == DEFAULT_MAX_TOKENS
     
     @patch('requests.post')
-    def test_generate_openai_with_custom_params(self, mock_post):
-        """Test OpenAI API with custom parameters."""
+    def test_generate_with_custom_params(self, mock_post):
+        """Test API with custom parameters."""
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {
@@ -271,8 +134,8 @@ class TestLLMClientOpenAIAPI:
         assert request_data["max_completion_tokens"] == 1024
     
     @patch('requests.post')
-    def test_generate_openai_no_choices(self, mock_post):
-        """Test OpenAI API response with no choices."""
+    def test_generate_no_choices(self, mock_post):
+        """Test API response with no choices."""
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {"choices": []}
@@ -287,8 +150,8 @@ class TestLLMClientOpenAIAPI:
         assert result["content"] == "Error: No content in API response"
     
     @patch('requests.post')
-    def test_generate_openai_missing_content(self, mock_post):
-        """Test OpenAI API response with missing content."""
+    def test_generate_missing_content(self, mock_post):
+        """Test API response with missing content."""
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {
@@ -310,16 +173,8 @@ class TestLLMClientOpenAIAPI:
 class TestLLMClientDryRun:
     """Test dry run functionality."""
     
-    def test_generate_dry_run_ollama(self):
-        """Test dry run with Ollama API."""
-        client = LLMClient(api_url="http://localhost:11434")
-        
-        result = client.generate("Test prompt", dry_run=True)
-        
-        assert result["content"] == "Test prompt"
-    
-    def test_generate_dry_run_openai(self):
-        """Test dry run with OpenAI API."""
+    def test_generate_dry_run(self):
+        """Test dry run functionality."""
         client = LLMClient(api_url="https://api.openai.com/v1/chat/completions")
         
         result = client.generate("Test prompt", dry_run=True)
@@ -386,82 +241,12 @@ class TestLLMClientEdgeCases:
             client.generate("Test prompt")
 
 
-class TestLLMClientURLHandling:
-    """Test URL handling and normalization."""
-    
-    @pytest.mark.skip(reason="LLMClient._build_url() method no longer exists")
-    def test_build_url_ollama_basic(self):
-        """Test building Ollama URL."""
-        client = LLMClient(api_url="http://localhost:11434")
-        url = client._build_url()
-        assert url == "http://localhost:11434/api/generate"
-    
-    @pytest.mark.skip(reason="LLMClient._build_url() method no longer exists")
-    def test_build_url_ollama_with_path(self):
-        """Test building Ollama URL with existing path."""
-        client = LLMClient(api_url="http://localhost:11434/api")
-        url = client._build_url()
-        assert url == "http://localhost:11434/api/generate"
-    
-    @pytest.mark.skip(reason="LLMClient._build_url() method no longer exists")
-    def test_build_url_ollama_with_trailing_slash(self):
-        """Test building Ollama URL with trailing slash."""
-        client = LLMClient(api_url="http://localhost:11434/")
-        url = client._build_url()
-        assert url == "http://localhost:11434/api/generate"
-    
-    @pytest.mark.skip(reason="LLMClient._build_url() method no longer exists")
-    def test_build_url_openai(self):
-        """Test building OpenAI URL."""
-        client = LLMClient(api_url="https://api.openai.com/v1/chat/completions")
-        url = client._build_url()
-        assert url == "https://api.openai.com/v1/chat/completions"
-    
-    @pytest.mark.skip(reason="LLMClient._build_url() method no longer exists")
-    def test_build_url_openai_base(self):
-        """Test building OpenAI URL from base."""
-        client = LLMClient(api_url="https://api.openai.com/v1")
-        url = client._build_url()
-        assert url == "https://api.openai.com/v1/chat/completions"
-
-
 class TestLLMClientIntegration:
     """Test LLM client integration scenarios."""
     
     @patch('requests.post')
-    def test_full_ollama_workflow(self, mock_post):
-        """Test complete Ollama workflow."""
-        mock_response = Mock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {
-            "response": "This is a generated commit message",
-            "done": True,
-            "context": [1, 2, 3]
-        }
-        mock_post.return_value = mock_response
-        
-        client = LLMClient(
-            api_url="http://localhost:11434",
-            model="llama3.2:latest",
-            temperature=0.7,
-            max_tokens=512
-        )
-        
-        prompt = "Generate a commit message for: Added new feature"
-        result = client.generate(prompt)
-        
-        assert "generated commit message" in result["content"].lower()
-        
-        # Verify all parameters were passed correctly
-        request_data = mock_post.call_args[1]["json"]
-        assert request_data["model"] == "llama3.2:latest"
-        assert request_data["messages"][0]["content"] == prompt
-        assert request_data["temperature"] == 0.7
-        assert request_data["max_completion_tokens"] == 512
-    
-    @patch('requests.post')
-    def test_full_openai_workflow(self, mock_post):
-        """Test complete OpenAI workflow."""
+    def test_full_api_workflow(self, mock_post):
+        """Test complete API workflow."""
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {

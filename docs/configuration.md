@@ -15,7 +15,7 @@ giv init
 
 This will create a `.giv/config` file in your project root and prompt you for:
 - Project name and description
-- API URL (OpenAI, Ollama, etc.)
+- API URL (OpenAI, etc.)
 - Model name
 - Other project settings
 
@@ -96,13 +96,6 @@ GIV_API_MODEL=gpt-4o-mini
 ```
 
 ## Configuration Examples
-
-### Local Ollama Setup
-```bash
-giv config set api.url "http://localhost:11434/v1/chat/completions"
-giv config set api.model "qwen2.5-coder"
-giv config set api.key "ollama"
-```
 
 ### OpenAI Setup
 ```bash
