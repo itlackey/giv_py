@@ -27,10 +27,40 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: latest
+          version: "1.8.3"
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
+
+      - name: Configure Poetry PATH and verify
+        shell: bash
+        run: |
+          # Add potential Poetry paths to PATH
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            export PATH="$APPDATA/Python/Scripts:$PATH"
+            export PATH="$APPDATA/pypoetry/venv/Scripts:$PATH"
+            echo "$APPDATA/Python/Scripts" >> $GITHUB_PATH
+            echo "$APPDATA/pypoetry/venv/Scripts" >> $GITHUB_PATH
+          fi
+          
+          # Try to find poetry
+          which poetry || echo "Poetry not found in PATH"
+          poetry --version || echo "Poetry version check failed"
+          
+          # If poetry still not found, try pip install as fallback
+          if ! command -v poetry &> /dev/null; then
+            echo "Installing Poetry via pip as fallback..."
+            python -m pip install --user poetry
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              export PATH="$HOME/.local/bin:$PATH"
+              echo "$HOME/.local/bin" >> $GITHUB_PATH
+            fi
+          fi
+          
+          # Final verification
+          poetry --version
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
 
       - name: Load cached venv
         id: cached-poetry-dependencies
@@ -41,21 +71,26 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        shell: bash
         run: poetry install --no-interaction --no-ansi
 
       - name: Run tests
+        shell: bash
         run: poetry run pytest -q
 
       - name: Debug Poetry environment
+        shell: bash
         run: |
           poetry env info
           poetry run python -c "import sys; print('Python path:', sys.path[:3])"
           poetry run python -c "import packaging; print('packaging version:', packaging.__version__)"
 
       - name: Build executable using build system
+        shell: bash
         run: poetry run python build/build.py binaries
 
       - name: List build outputs
+        shell: bash
         run: find dist/ -type f -name "*" 2>/dev/null || echo "No dist directory found"
 
       - name: Archive artifact
