@@ -396,7 +396,7 @@ class MarkdownProcessor:
 
     def fix_relative_links(self, content: str, base_path: str) -> str:
         """Fix relative links in markdown content."""
-        base_path = Path(base_path)
+        import posixpath
         
         # Pattern to match markdown links: [text](url)
         link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
@@ -413,9 +413,10 @@ class MarkdownProcessor:
             if url.startswith('#'):
                 return match.group(0)
             
-            # Convert relative path to absolute
+            # Convert relative path to absolute using POSIX paths (for markdown consistency)
             if not url.startswith('/'):
-                fixed_url = (base_path / url).resolve()
+                # Use posixpath to maintain forward slashes regardless of OS
+                fixed_url = posixpath.normpath(posixpath.join(base_path, url))
                 return f'[{text}]({fixed_url})'
             
             return match.group(0)

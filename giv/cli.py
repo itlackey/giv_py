@@ -817,7 +817,7 @@ def _run_init(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
         for template_file in system_templates_dir.glob("*.md"):
             dest = templates_dir / template_file.name
             if not dest.exists():
-                dest.write_text(template_file.read_text())
+                dest.write_text(template_file.read_text(encoding='utf-8'), encoding='utf-8')
     
     print(f"Initialised {giv_dir}")
     return 0

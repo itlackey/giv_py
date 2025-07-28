@@ -54,7 +54,13 @@ class ConfigManager:
             current_dir = current_dir.parent
 
         # 2. Fall back to user-level config
-        home = Path(os.environ.get("HOME", "~")).expanduser()
+        # Use pathlib's home directory resolution, but respect HOME env var for testing
+        if "HOME" in os.environ and os.environ["HOME"] != str(Path.home()):
+            # HOME was explicitly set (likely for testing), use it
+            home = Path(os.environ["HOME"])
+        else:
+            # Use pathlib's home directory resolution which handles Windows correctly
+            home = Path.home()
         return home / ".giv" / "config"
 
     def _normalize_key(self, key: str) -> str:

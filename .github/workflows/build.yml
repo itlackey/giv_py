@@ -78,13 +78,6 @@ jobs:
         shell: bash
         run: poetry run pytest -q
 
-      - name: Debug Poetry environment
-        shell: bash
-        run: |
-          poetry env info
-          poetry run python -c "import sys; print('Python path:', sys.path[:3])"
-          poetry run python -c "import packaging; print('packaging version:', packaging.__version__)"
-
       - name: Build executable using build system
         shell: bash
         run: poetry run python build/build.py binaries
