@@ -1,5 +1,5 @@
 """
-giv_cli package
+giv package
 
 This package contains a Python rewrite of the original Bash‐based `giv` command
 line interface.  The goal of the rewrite is to provide an equivalent feature
@@ -15,7 +15,7 @@ __all__ = ["__version__"]
 
 try:
     # Read version from package metadata when installed
-    __version__ = metadata.version("giv_cli")
+    __version__ = metadata.version("giv")
 except metadata.PackageNotFoundError:
     # Fallback during development
     __version__ = "0.1.0"

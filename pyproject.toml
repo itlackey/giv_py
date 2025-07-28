@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "giv-cli"
+name = "giv"
 version = "1.0.0"
 description = "Intelligent Git commit message and changelog generator powered by AI"
 authors = ["giv Development Team <giv@example.com>"]
@@ -25,12 +25,10 @@ classifiers = [
     "Topic :: Software Development :: Documentation",
     "Topic :: Text Processing :: Markup :: Markdown",
 ]
-packages = [{include = "giv_cli"}]
+packages = [{include = "giv"}]
 include = [
-    "giv_cli/templates/*.md",
+    "giv/templates/*.md",
     "README.md",
-    "MIGRATION.md", 
-    "TROUBLESHOOTING.md",
 ]
 
 [tool.poetry.dependencies]
@@ -48,7 +46,7 @@ mypy = "^1.5.0"
 pre-commit = "^3.4.0"
 
 [tool.poetry.scripts]
-giv = "giv_cli.main:main"
+giv = "giv.main:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -102,7 +100,7 @@ markers = [
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["giv_cli"]
+source = ["giv"]
 branch = true
 
 [tool.coverage.report]

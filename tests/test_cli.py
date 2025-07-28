@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from giv_cli.main import main
+from giv.main import main
 
 
 def test_version_flag(capsys):

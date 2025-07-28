@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-from giv_cli.config import ConfigManager
+from giv.config import ConfigManager
 
 
 def test_config_set_get_list_unset():

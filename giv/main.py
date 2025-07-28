@@ -3,7 +3,7 @@ Entry point for the `giv` command line application.
 
 This module constructs the argument parser and dispatches to the
 appropriate subcommand function.  It exists as a thin wrapper around the
-command definitions in :mod:`giv_cli.cli`.
+command definitions in :mod:`giv.cli`.
 """
 from __future__ import annotations
 

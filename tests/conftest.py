@@ -16,7 +16,7 @@ from typing import Generator, Dict, Any
 import subprocess
 import pytest
 
-from giv_cli.config import ConfigManager
+from giv.config import ConfigManager
 
 
 @pytest.fixture
@@ -199,7 +199,7 @@ class PythonGivRunner:
     def run(self, args: list, **kwargs) -> subprocess.CompletedProcess:
         """Run a Python giv command."""
         # Import here to avoid circular imports
-        from giv_cli.main import main
+        from giv.main import main
         import sys
         from io import StringIO
         

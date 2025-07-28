@@ -13,7 +13,7 @@ import pytest
 import subprocess
 from pathlib import Path
 
-from giv_cli.git_utils import GitHistory
+from giv.git_utils import GitHistory
 
 
 class TestGitHistory:

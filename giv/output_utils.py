@@ -1,5 +1,5 @@
 """
-Output management utilities for giv_cli.
+Output management utilities for giv.
 
 This module provides comprehensive output management that matches the
 Bash implementation exactly, including:

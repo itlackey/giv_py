@@ -13,7 +13,7 @@ import pytest
 import subprocess
 from pathlib import Path
 
-from giv_cli.main import main
+from giv.main import main
 
 
 class TestBasicCommands:

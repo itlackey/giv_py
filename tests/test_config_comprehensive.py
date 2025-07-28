@@ -11,7 +11,7 @@ import os
 import pytest
 from pathlib import Path
 
-from giv_cli.config import ConfigManager
+from giv.config import ConfigManager
 
 
 class TestConfigManager:

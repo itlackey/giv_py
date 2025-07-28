@@ -38,7 +38,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --name giv --onefile giv_cli/main.py
+          pyinstaller --name giv --onefile giv/main.py
 
       - name: Archive artifact
         uses: actions/upload-artifact@v3

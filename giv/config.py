@@ -1,5 +1,5 @@
 """
-Configuration management for giv_cli.
+Configuration management for giv.
 
 This module provides comprehensive configuration management that matches the
 Bash implementation exactly, including:

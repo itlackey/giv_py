@@ -17,3 +17,4 @@ dist/
 # IDEs and editors
 .vscode/
 .idea/
+.remove/

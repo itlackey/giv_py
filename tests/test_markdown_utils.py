@@ -12,7 +12,7 @@ Tests markdown processing functionality including:
 import pytest
 from pathlib import Path
 
-from giv_cli.markdown_utils import MarkdownProcessor
+from giv.markdown_utils import MarkdownProcessor
 
 
 class TestMarkdownProcessor:

@@ -1,5 +1,5 @@
 """
-Template system for giv_cli.
+Template system for giv.
 
 This module provides comprehensive template management that matches the
 Bash implementation exactly, including:
