@@ -46,19 +46,20 @@ jobs:
       - name: Run tests
         run: poetry run pytest -q
 
-      - name: Build executable using build system
-        shell: bash
+      - name: Debug Poetry environment
         run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            python build/build.py binaries
-          else
-            ./build/build.py binaries
-          fi
+          poetry env info
+          poetry run python -c "import sys; print('Python path:', sys.path[:3])"
+          poetry run python -c "import packaging; print('packaging version:', packaging.__version__)"
+
+      - name: Build executable using build system
+        run: poetry run python build/build.py binaries
 
       - name: List build outputs
         run: find dist/ -type f -name "*" 2>/dev/null || echo "No dist directory found"
 
       - name: Archive artifact
+        if: hashFiles('dist/**/*') != ''
         uses: actions/upload-artifact@v4
         with:
           name: giv-${{ matrix.os }}
