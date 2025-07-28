@@ -1,5 +1,5 @@
 """
-Template system for giv.
+Template system and rendering engine.
 
 This module provides comprehensive template management that matches the
 Bash implementation exactly, including:
@@ -15,12 +15,25 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+from ..constants import TEMPLATES_DIR
+from ..errors import TemplateError
 
-class TemplateManager:
-    """Manage template discovery, loading, and token replacement."""
+
+class TemplateEngine:
+    """Template discovery, loading, and rendering engine.
+    
+    This class provides a normalized interface to template operations,
+    replacing the original TemplateManager class with more consistent naming.
+    """
 
     def __init__(self, template_dir: Optional[Path] = None) -> None:
-        """Initialize template manager with optional custom template directory."""
+        """Initialize template engine with optional custom template directory.
+        
+        Parameters
+        ----------
+        template_dir : Optional[Path]
+            Custom template directory to search in addition to standard locations
+        """
         self.template_dir = template_dir
 
     def find_template(self, template_name: str) -> Path:
@@ -52,7 +65,7 @@ class TemplateManager:
             template_path = Path(template_name)
             if template_path.exists():
                 return template_path
-            raise FileNotFoundError(f"Template not found: {template_path}")
+            raise TemplateError(f"Template not found: {template_path}")
 
         # 2. Check project-level .giv/templates/
         current_dir = Path.cwd()
@@ -69,7 +82,7 @@ class TemplateManager:
             return user_templates
 
         # 4. Check system templates (bundled with package)
-        system_templates = Path(__file__).parent / "templates" / template_name
+        system_templates = Path(__file__).parent.parent / TEMPLATES_DIR / template_name
         if system_templates.exists():
             return system_templates
 
@@ -79,7 +92,7 @@ class TemplateManager:
             if custom_template.exists():
                 return custom_template
 
-        raise FileNotFoundError(f"Template not found: {template_name}")
+        raise TemplateError(f"Template not found: {template_name}")
 
     def load_template(self, template_name: str) -> str:
         """Load template content from file.
@@ -200,7 +213,7 @@ class TemplateManager:
         templates = {}
         
         # System templates
-        system_templates_dir = Path(__file__).parent / "templates"
+        system_templates_dir = Path(__file__).parent.parent / TEMPLATES_DIR
         if system_templates_dir.exists():
             for template_file in system_templates_dir.glob("*.md"):
                 templates[template_file.name] = template_file
@@ -229,17 +242,32 @@ class TemplateManager:
         return templates
 
 
-# Default template manager instance
-default_template_manager = TemplateManager()
+# Backward compatibility aliases
+TemplateManager = TemplateEngine
+
+# Default template engine instance
+default_template_engine = TemplateEngine()
 
 
 def render_template(template_path: Union[Path, str], context: Dict[str, Any]) -> str:
     """Convenience function for rendering templates.
     
     This function provides backward compatibility with the existing code.
+    
+    Parameters
+    ----------
+    template_path : Union[Path, str]
+        Path to template file or template name
+    context : Dict[str, Any]
+        Template context variables
+        
+    Returns
+    -------
+    str
+        Rendered template content
     """
     if isinstance(template_path, str):
-        return default_template_manager.render_template_file(template_path, context)
+        return default_template_engine.render_template_file(template_path, context)
     else:
         template_content = template_path.read_text(encoding="utf-8")
-        return default_template_manager.render_template(template_content, context)
+        return default_template_engine.render_template(template_content, context)

@@ -18,17 +18,21 @@ from typing import Any, Dict
 
 from . import __version__
 from .config import ConfigManager
-from .git_utils import GitHistory
-from .llm_utils import LLMClient
-from .markdown_utils import MarkdownProcessor
-from .project_metadata import ProjectMetadata
-from .template_utils import TemplateManager
-from .output_utils import write_output
+from .commands import (
+    MessageCommand,
+    SummaryCommand, 
+    DocumentCommand,
+    ChangelogCommand,
+    ReleaseNotesCommand,
+    AnnouncementCommand,
+    ConfigCommand,
+)
+from .lib.templates import TemplateEngine
 
 logger = logging.getLogger(__name__)
 
 
-def _add_common_args(parser):
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
     """Add common arguments that can appear after subcommands."""
     parser.add_argument("--verbose", action="store_true", help="Enable debug/trace output")  
     parser.add_argument("--dry-run", action="store_true", help="Preview only; don't write any files")
@@ -198,19 +202,19 @@ def run_command(args: argparse.Namespace) -> int:
 
     # Dispatch to subcommands
     if args.command == "config":
-        return _run_config(args, cfg_mgr)
+        return ConfigCommand(args, cfg_mgr).run()
     elif args.command in ["message", "msg"]:
-        return _run_message(args, cfg_mgr)
+        return MessageCommand(args, cfg_mgr).run()
     elif args.command == "summary":
-        return _run_summary(args, cfg_mgr)
+        return SummaryCommand(args, cfg_mgr).run()
     elif args.command == "document":
-        return _run_document(args, cfg_mgr)
+        return DocumentCommand(args, cfg_mgr).run()
     elif args.command == "changelog":
-        return _run_changelog(args, cfg_mgr)
+        return ChangelogCommand(args, cfg_mgr).run()
     elif args.command == "release-notes":
-        return _run_release_notes(args, cfg_mgr)
+        return ReleaseNotesCommand(args, cfg_mgr).run()
     elif args.command == "announcement":
-        return _run_announcement(args, cfg_mgr)
+        return AnnouncementCommand(args, cfg_mgr).run()
     elif args.command == "available-releases":
         return _run_available_releases(args, cfg_mgr)
     elif args.command == "update":
@@ -226,8 +230,8 @@ def run_command(args: argparse.Namespace) -> int:
         return 0
     else:
         # Unknown command
-        print(f"Error: Unknown subcommand '{args.command}'.", file=os.sys.stderr)
-        print("Use -h or --help for usage information.", file=os.sys.stderr)
+        print(f"Error: Unknown subcommand '{args.command}'.", file=sys.stderr)
+        print("Use -h or --help for usage information.", file=sys.stderr)
         return 1
 
 
@@ -254,397 +258,8 @@ def _apply_global_args(args: argparse.Namespace, cfg_mgr: ConfigManager) -> None
         cfg_mgr.set("output_version", args.output_version)
 
 
-def _run_config(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``config`` subcommand."""
-    # Determine operation from flag-style arguments
-    operation = None
-    if args.list:
-        operation = "list"
-    elif args.get:
-        operation = "get"
-    elif args.set:
-        operation = "set"
-    elif args.unset:
-        operation = "unset"
-    
-    key = args.key
-    value = args.value
-    
-    # Handle "show" as an alias for "list"
-    if key == "show":
-        operation = "list"
-        key = None
-    
-    # Handle different config operations
-    if operation == "list" or (not operation and not key):
-        # List all configuration values
-        items = cfg_mgr.list()
-        for k, v in items.items():
-            print(f"{k}={v}")
-        return 0
-    elif operation == "get" or (key and not value and not operation):
-        # Get a configuration value
-        if not key:
-            print("Error: key required for get operation", file=sys.stderr)
-            return 1
-        value_result = cfg_mgr.get(key)
-        if value_result is None:
-            print(f"{key} is not set", file=sys.stderr)
-            return 1
-        else:
-            print(value_result)
-            return 0
-    elif operation == "set" or (key and value):
-        # Set a configuration value
-        if not key or not value:
-            print("Error: both key and value required for set operation", file=sys.stderr)
-            return 1
-        cfg_mgr.set(key, value)
-        return 0
-    elif operation == "unset":
-        # Remove a configuration value
-        if not key:
-            print("Error: key required for unset operation", file=sys.stderr)
-            return 1
-        cfg_mgr.unset(key)
-        return 0
-    else:
-        print("Error: Unknown config operation", file=sys.stderr)
-        return 1
 
 
-def _run_message(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``message`` subcommand."""
-    revision = getattr(args, 'revision', '--current') or '--current'
-    pathspec = getattr(args, 'pathspec', []) or []
-    
-    return _run_document_command(args, cfg_mgr, "message_prompt.md", revision, pathspec)
-
-
-def _run_summary(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``summary`` subcommand."""
-    revision = getattr(args, 'revision', '--current') or '--current'
-    pathspec = getattr(args, 'pathspec', []) or []
-    
-    return _run_document_command(args, cfg_mgr, "final_summary_prompt.md", revision, pathspec)
-
-
-def _run_document(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``document`` subcommand."""
-    revision = getattr(args, 'revision', '--current') or '--current'
-    pathspec = getattr(args, 'pathspec', []) or []
-    
-    if not args.prompt_file:
-        print("Error: --prompt-file is required for the document subcommand.", file=os.sys.stderr)
-        return 1
-    
-    return _run_document_command(args, cfg_mgr, args.prompt_file, revision, pathspec)
-
-
-def _run_changelog(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``changelog`` subcommand with full output mode support."""
-    revision = getattr(args, 'revision', '--current') or '--current'
-    pathspec = getattr(args, 'pathspec', []) or []
-    
-    # Get configuration
-    output_file = args.output_file or cfg_mgr.get("changelog_file") or "CHANGELOG.md"
-    output_mode = args.output_mode or cfg_mgr.get("output_mode") or "auto"
-    output_version = args.output_version or cfg_mgr.get("output_version") or ProjectMetadata.get_version()
-    
-    # Handle "auto" mode mapping for changelog
-    if output_mode == "auto":
-        output_mode = "update"
-    
-    # Generate the changelog content using document command logic
-    history = GitHistory()
-    template_mgr = TemplateManager()
-    
-    # Convert pathspec list to format expected by git_utils
-    paths = pathspec if pathspec else None
-    
-    diff_text = history.get_diff(revision=revision, paths=paths)
-
-    # Build context for template rendering with enhanced git metadata
-    git_metadata = history.build_history_metadata(revision or "HEAD")
-    
-    context = {
-        "SUMMARY": diff_text,
-        "HISTORY": diff_text, 
-        "REVISION": revision or "HEAD",
-        "PROJECT_TITLE": ProjectMetadata.get_title(),
-        "VERSION": output_version,
-        "COMMIT_ID": git_metadata["commit_id"],
-        "SHORT_COMMIT_ID": git_metadata["short_commit_id"], 
-        "DATE": git_metadata["date"],
-        "MESSAGE": git_metadata["message"],
-        "MESSAGE_BODY": git_metadata["message_body"],
-        "BRANCH": git_metadata["branch"],
-        "EXAMPLE": "",  # TODO: Add example context if needed
-        "RULES": "",   # TODO: Add rules context if needed
-    }
-    
-    try:
-        prompt = template_mgr.render_template_file("changelog_prompt.md", context)
-    except FileNotFoundError as e:
-        print(f"Error: Template not found: {e}", file=sys.stderr)
-        return 1
-
-    # Determine model and API settings
-    api_url = args.api_url or cfg_mgr.get("api_url")
-    api_key = args.api_key or cfg_mgr.get("api_key")
-    model = args.api_model or args.model or cfg_mgr.get("api_model")
-    
-    # Get temperature and context window settings
-    temperature = float(cfg_mgr.get("temperature") or "0.7")  # Lower temp for changelog
-    max_tokens = int(cfg_mgr.get("max_tokens") or "8192")
-    
-    llm = LLMClient(
-        api_url=api_url, 
-        api_key=api_key, 
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens
-    )
-    
-    if args.dry_run:
-        # Show what would be written
-        print("Dry run: Generated changelog content:")
-        print("=" * 50)
-        response = llm.generate(prompt, dry_run=True)
-        content = response.get("content", prompt)
-        
-        # Show how it would be written
-        success = write_output(
-            content=content,
-            output_file=output_file,
-            output_mode=output_mode, 
-            output_version=output_version,
-            dry_run=True
-        )
-        return 0 if success else 1
-    
-    # Generate the changelog content
-    response = llm.generate(prompt, dry_run=False)
-    content = response.get("content", "")
-    
-    if not content:
-        print("Error: No content generated", file=sys.stderr)
-        return 1
-    
-    # Write the changelog using output management
-    success = write_output(
-        content=content,
-        output_file=output_file,
-        output_mode=output_mode,
-        output_version=output_version,
-        dry_run=False
-    )
-    
-    return 0 if success else 1
-
-
-def _run_release_notes(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``release-notes`` subcommand with full output mode support."""
-    revision = getattr(args, 'revision', '--current') or '--current'
-    pathspec = getattr(args, 'pathspec', []) or []
-    
-    # Get configuration
-    output_file = args.output_file or cfg_mgr.get("release_notes_file") or "RELEASE_NOTES.md"
-    output_mode = args.output_mode or cfg_mgr.get("output_mode") or "auto"  
-    output_version = args.output_version or cfg_mgr.get("output_version") or ProjectMetadata.get_version()
-    
-    # Handle "auto" mode mapping for release notes
-    if output_mode == "auto":
-        output_mode = "overwrite"  # Release notes typically overwrite
-    
-    # Use the standard document generation logic with output management
-    history = GitHistory()
-    template_mgr = TemplateManager()
-    
-    # Convert pathspec list to format expected by git_utils
-    paths = pathspec if pathspec else None
-    
-    diff_text = history.get_diff(revision=revision, paths=paths)
-
-    # Build context for template rendering with enhanced git metadata
-    git_metadata = history.build_history_metadata(revision or "HEAD")
-    
-    context = {
-        "SUMMARY": diff_text,
-        "HISTORY": diff_text, 
-        "REVISION": revision or "HEAD",
-        "PROJECT_TITLE": ProjectMetadata.get_title(),
-        "VERSION": output_version,
-        "COMMIT_ID": git_metadata["commit_id"],
-        "SHORT_COMMIT_ID": git_metadata["short_commit_id"], 
-        "DATE": git_metadata["date"],
-        "MESSAGE": git_metadata["message"],
-        "MESSAGE_BODY": git_metadata["message_body"],
-        "BRANCH": git_metadata["branch"],
-        "EXAMPLE": "",  # TODO: Add example context if needed
-        "RULES": "",   # TODO: Add rules context if needed
-    }
-    
-    try:
-        prompt = template_mgr.render_template_file("release_notes_prompt.md", context)
-    except FileNotFoundError as e:
-        print(f"Error: Template not found: {e}", file=sys.stderr)
-        return 1
-
-    # Determine model and API settings
-    api_url = args.api_url or cfg_mgr.get("api_url")
-    api_key = args.api_key or cfg_mgr.get("api_key")
-    model = args.api_model or args.model or cfg_mgr.get("api_model")
-    
-    # Get temperature and context window settings
-    temperature = float(cfg_mgr.get("temperature") or "0.7")
-    max_tokens = int(cfg_mgr.get("max_tokens") or "8192")
-    
-    llm = LLMClient(
-        api_url=api_url, 
-        api_key=api_key, 
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens
-    )
-    
-    if args.dry_run:
-        # Show what would be written
-        print("Dry run: Generated release notes content:")
-        print("=" * 50)
-        response = llm.generate(prompt, dry_run=True)
-        content = response.get("content", prompt)
-        
-        # Show how it would be written
-        success = write_output(
-            content=content,
-            output_file=output_file,
-            output_mode=output_mode, 
-            output_version=output_version,
-            dry_run=True
-        )
-        return 0 if success else 1
-    
-    # Generate the release notes content
-    response = llm.generate(prompt, dry_run=False)
-    content = response.get("content", "")
-    
-    if not content:
-        print("Error: No content generated", file=sys.stderr)
-        return 1
-    
-    # Write the release notes using output management
-    success = write_output(
-        content=content,
-        output_file=output_file,
-        output_mode=output_mode,
-        output_version=output_version,
-        dry_run=False
-    )
-    
-    return 0 if success else 1
-
-
-def _run_announcement(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``announcement`` subcommand with full output mode support."""
-    revision = getattr(args, 'revision', '--current') or '--current'
-    pathspec = getattr(args, 'pathspec', []) or []
-    
-    # Get configuration
-    output_file = args.output_file or cfg_mgr.get("announcement_file") or "ANNOUNCEMENT.md"
-    output_mode = args.output_mode or cfg_mgr.get("output_mode") or "auto"
-    output_version = args.output_version or cfg_mgr.get("output_version") or ProjectMetadata.get_version()
-    
-    # Handle "auto" mode mapping for announcements
-    if output_mode == "auto":
-        output_mode = "overwrite"  # Announcements typically overwrite
-    
-    # Use the standard document generation logic with output management
-    history = GitHistory()
-    template_mgr = TemplateManager()
-    
-    # Convert pathspec list to format expected by git_utils
-    paths = pathspec if pathspec else None
-    
-    diff_text = history.get_diff(revision=revision, paths=paths)
-
-    # Build context for template rendering with enhanced git metadata
-    git_metadata = history.build_history_metadata(revision or "HEAD")
-    
-    context = {
-        "SUMMARY": diff_text,
-        "HISTORY": diff_text, 
-        "REVISION": revision or "HEAD",
-        "PROJECT_TITLE": ProjectMetadata.get_title(),
-        "VERSION": output_version,
-        "COMMIT_ID": git_metadata["commit_id"],
-        "SHORT_COMMIT_ID": git_metadata["short_commit_id"], 
-        "DATE": git_metadata["date"],
-        "MESSAGE": git_metadata["message"],
-        "MESSAGE_BODY": git_metadata["message_body"],
-        "BRANCH": git_metadata["branch"],
-        "EXAMPLE": "",  # TODO: Add example context if needed
-        "RULES": "",   # TODO: Add rules context if needed
-    }
-    
-    try:
-        prompt = template_mgr.render_template_file("announcement_prompt.md", context)
-    except FileNotFoundError as e:
-        print(f"Error: Template not found: {e}", file=sys.stderr)
-        return 1
-
-    # Determine model and API settings
-    api_url = args.api_url or cfg_mgr.get("api_url")
-    api_key = args.api_key or cfg_mgr.get("api_key")
-    model = args.api_model or args.model or cfg_mgr.get("api_model")
-    
-    # Get temperature and context window settings
-    temperature = float(cfg_mgr.get("temperature") or "0.9")  # Higher temp for creative content
-    max_tokens = int(cfg_mgr.get("max_tokens") or "8192")
-    
-    llm = LLMClient(
-        api_url=api_url, 
-        api_key=api_key, 
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens
-    )
-    
-    if args.dry_run:
-        # Show what would be written
-        print("Dry run: Generated announcement content:")
-        print("=" * 50)
-        response = llm.generate(prompt, dry_run=True)
-        content = response.get("content", prompt)
-        
-        # Show how it would be written
-        success = write_output(
-            content=content,
-            output_file=output_file,
-            output_mode=output_mode, 
-            output_version=output_version,
-            dry_run=True
-        )
-        return 0 if success else 1
-    
-    # Generate the announcement content
-    response = llm.generate(prompt, dry_run=False)
-    content = response.get("content", "")
-    
-    if not content:
-        print("Error: No content generated", file=sys.stderr)
-        return 1
-    
-    # Write the announcement using output management
-    success = write_output(
-        content=content,
-        output_file=output_file,
-        output_mode=output_mode,
-        output_version=output_version,
-        dry_run=False
-    )
-    
-    return 0 if success else 1
 
 
 def _run_available_releases(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
@@ -665,7 +280,7 @@ def _run_available_releases(args: argparse.Namespace, cfg_mgr: ConfigManager) ->
         
         return 0
     except Exception as e:
-        print(f"Error fetching releases: {e}", file=os.sys.stderr)
+        print(f"Error fetching releases: {e}", file=sys.stderr)
         return 1
 
 
@@ -686,7 +301,7 @@ def _run_update(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
             releases_data = json.loads(response.read().decode('utf-8'))
         
         if not releases_data:
-            print("No releases available", file=os.sys.stderr)
+            print("No releases available", file=sys.stderr)
             return 1
         
         # Determine the actual version to install
@@ -698,8 +313,8 @@ def _run_update(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
             # Verify the specified version exists
             available_versions = [release['tag_name'] for release in releases_data]
             if target_version not in available_versions:
-                print(f"Error: Version {target_version} not found in available releases", file=os.sys.stderr)
-                print(f"Available versions: {', '.join(available_versions)}", file=os.sys.stderr)
+                print(f"Error: Version {target_version} not found in available releases", file=sys.stderr)
+                print(f"Available versions: {', '.join(available_versions)}", file=sys.stderr)
                 return 1
             actual_version = target_version
             print(f"Updating giv to version {actual_version}...")
@@ -716,93 +331,23 @@ def _run_update(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
             curl_proc.stdout.close()
             
             if result.returncode != 0:
-                print(f"Error: Installation failed with exit code {result.returncode}", file=os.sys.stderr)
+                print(f"Error: Installation failed with exit code {result.returncode}", file=sys.stderr)
                 return 1
         
         print("Update complete.")
         return 0
         
     except Exception as e:
-        print(f"Error during update: {e}", file=os.sys.stderr)
+        print(f"Error during update: {e}", file=sys.stderr)
         return 1
 
 
-def _run_document_command(args: argparse.Namespace, cfg_mgr: ConfigManager, template_name: str, 
-                         revision: str, pathspec: list) -> int:
-    """Common document generation logic shared by multiple commands."""
-    history = GitHistory()
-    template_mgr = TemplateManager()
-    
-    # Convert pathspec list to format expected by git_utils
-    paths = pathspec if pathspec else None
-    
-    diff_text = history.get_diff(revision=revision, paths=paths)
-
-    # Build context for template rendering with enhanced git metadata
-    git_metadata = history.build_history_metadata(revision or "HEAD")
-    
-    context = {
-        "SUMMARY": diff_text,
-        "HISTORY": diff_text, 
-        "REVISION": revision or "HEAD",
-        "PROJECT_TITLE": ProjectMetadata.get_title(),
-        "VERSION": ProjectMetadata.get_version(),
-        "COMMIT_ID": git_metadata["commit_id"],
-        "SHORT_COMMIT_ID": git_metadata["short_commit_id"], 
-        "DATE": git_metadata["date"],
-        "MESSAGE": git_metadata["message"],
-        "MESSAGE_BODY": git_metadata["message_body"],
-        "BRANCH": git_metadata["branch"],
-        "EXAMPLE": "",  # TODO: Add example context if needed
-        "RULES": "",   # TODO: Add rules context if needed
-    }
-    
-    try:
-        prompt = template_mgr.render_template_file(template_name, context)
-    except FileNotFoundError as e:
-        print(f"Error: Template not found: {e}", file=sys.stderr)
-        return 1
-
-    # Determine model and API settings
-    api_url = args.api_url or cfg_mgr.get("api_url")
-    api_key = args.api_key or cfg_mgr.get("api_key")
-    model = args.api_model or args.model or cfg_mgr.get("api_model")
-    
-    # Get temperature and context window settings
-    temperature = float(cfg_mgr.get("temperature", "0.9"))
-    max_tokens = int(cfg_mgr.get("max_tokens", "8192"))
-    
-    llm = LLMClient(
-        api_url=api_url, 
-        api_key=api_key, 
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens
-    )
-    
-    if args.dry_run:
-        # Just show the prompt
-        print(prompt)
-        return 0
-    
-    response = llm.generate(prompt, dry_run=args.dry_run)
-    output = response.get("content", "")
-    
-    # Write output to file or stdout
-    output_file = args.output_file or cfg_mgr.get("output_file")
-    if output_file:
-        Path(output_file).write_text(output)
-        print(f"Response written to {output_file}", file=os.sys.stderr)
-    else:
-        print(output)
-    
-    return 0
 
 
 def _run_init(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
     """Handle the ``init`` subcommand."""
     # Create a .giv directory and copy default templates using template manager
-    template_mgr = TemplateManager()
+    template_mgr = TemplateEngine()
     cwd = Path.cwd()
     giv_dir = cwd / ".giv"
     giv_dir.mkdir(exist_ok=True)

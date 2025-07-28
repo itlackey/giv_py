@@ -54,10 +54,11 @@ class ConfigManager:
             current_dir = current_dir.parent
 
         # 2. Fall back to user-level config
-        # Use pathlib's home directory resolution, but respect HOME env var for testing
-        if "HOME" in os.environ and os.environ["HOME"] != str(Path.home()):
-            # HOME was explicitly set (likely for testing), use it
-            home = Path(os.environ["HOME"])
+        # Check for HOME first (Unix/testing), then USERPROFILE (Windows), then use Path.home()
+        home_env = os.environ.get("HOME") or os.environ.get("USERPROFILE")
+        if home_env:
+            # Environment variable was explicitly set, use it
+            home = Path(home_env)
         else:
             # Use pathlib's home directory resolution which handles Windows correctly
             home = Path.home()

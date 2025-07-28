@@ -1,5 +1,5 @@
 """
-Utilities for interacting with Git repositories.
+Git repository operations and utilities.
 
 This module provides comprehensive Git functionality that matches the Bash
 implementation exactly, including:
@@ -23,11 +23,21 @@ from typing import Dict, List, Optional, Tuple, Union
 logger = logging.getLogger(__name__)
 
 
-class GitHistory:
-    """Interact with the Git history of the current repository."""
+class GitRepository:
+    """Interact with Git repositories and their history.
+    
+    This class provides a normalized interface to Git operations,
+    replacing the original GitHistory class with more consistent naming.
+    """
 
     def __init__(self, repo_path: Optional[Path] = None) -> None:
-        # default to current working directory
+        """Initialize Git repository interface.
+        
+        Parameters
+        ----------
+        repo_path : Optional[Path]
+            Path to the Git repository. Defaults to current working directory.
+        """
         self.repo_path = repo_path or Path.cwd()
 
     def get_diff(self, revision: Optional[str] = None, paths: Optional[List[str]] = None, 
@@ -39,13 +49,13 @@ class GitHistory:
 
         Parameters
         ----------
-        revision:
+        revision : Optional[str]
             A Git revision range (e.g. ``HEAD~1..HEAD``), single commit, 
             "--cached" for staged changes, "--current" or None for working tree.
-        paths:
+        paths : Optional[List[str]]
             Optional list of paths to limit the diff to.  When provided, only
             matching files are included.
-        include_untracked:
+        include_untracked : bool
             Whether to include untracked files in the diff output.
 
         Returns
@@ -139,7 +149,7 @@ class GitHistory:
         
         Parameters
         ----------
-        commit:
+        commit : str
             Commit hash, reference, or special values "--current", "--cached"
             
         Returns
@@ -234,6 +244,11 @@ class GitHistory:
     def build_history_metadata(self, commit: str = "HEAD") -> Dict[str, str]:
         """Build commit metadata dictionary matching Bash print_commit_metadata.
         
+        Parameters
+        ----------
+        commit : str
+            Commit reference to get metadata for
+            
         Returns
         -------
         Dict[str, str]
@@ -253,6 +268,22 @@ class GitHistory:
         """Return the git log for the given range.
 
         Enhanced version with more options to match Bash functionality.
+        
+        Parameters
+        ----------
+        revision : Optional[str]
+            Revision range to get log for
+        paths : Optional[List[str]]
+            Paths to limit log to
+        pretty : str
+            Format for log output
+        max_count : Optional[int]
+            Maximum number of commits to return
+            
+        Returns
+        -------
+        str
+            Git log output
         """
         cmd: List[str] = ["git", "log"]
         if max_count is not None:
@@ -312,3 +343,7 @@ class GitHistory:
             # Git is not installed
             logger.debug("git executable not found")
             return ""
+
+
+# Backward compatibility alias
+GitHistory = GitRepository

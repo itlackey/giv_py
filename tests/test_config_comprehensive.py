@@ -29,7 +29,8 @@ class TestConfigManager:
             cfg = ConfigManager()
             # Should look for config in ~/.giv/config
             expected_path = temp_dir / ".giv" / "config"
-            assert cfg.config_path == expected_path
+            # Use resolved paths for Windows compatibility
+            assert cfg.config_path.resolve() == expected_path.resolve()
         finally:
             os.chdir(old_cwd)
             if old_home:

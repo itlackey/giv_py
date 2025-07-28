@@ -1,5 +1,5 @@
 """
-Project metadata extraction.
+Project metadata extraction and management.
 
 This module provides comprehensive project metadata detection that matches
 the Bash implementation exactly, including:
@@ -25,7 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectMetadata:
-    """Comprehensive project metadata detection matching Bash implementation."""
+    """Project metadata detection and extraction system.
+    
+    This class provides comprehensive project metadata detection matching
+    the Bash implementation, with support for multiple project types and
+    Git-aware metadata extraction.
+    """
     
     _cache: Dict[str, Dict[str, str]] = {}
     
@@ -323,6 +328,16 @@ class ProjectMetadata:
         """Get all available project metadata as a dictionary.
         
         This method is cached for performance.
+        
+        Parameters
+        ----------
+        commit : str
+            Git commit to get metadata from
+            
+        Returns
+        -------
+        Dict[str, str]
+            Dictionary containing all available metadata
         """
         project_type = cls.detect_project_type()
         

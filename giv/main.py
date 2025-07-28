@@ -17,7 +17,7 @@ from .cli import build_parser, run_command
 logger = logging.getLogger(__name__)
 
 
-def _preprocess_args(argv):
+def _preprocess_args(argv: list[str]) -> list[str]:
     """Preprocess arguments to handle Bash-style config command syntax."""
     if not argv:
         return argv
@@ -43,7 +43,7 @@ def _preprocess_args(argv):
     return argv
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     """Entry point for the ``giv`` command.
 
     This is the main entry point for giv CLI.  It parses the command line

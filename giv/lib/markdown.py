@@ -1,5 +1,5 @@
 """
-Markdown processing utilities.
+Markdown processing and manipulation utilities.
 
 This module provides comprehensive markdown processing functionality that
 mirrors the original Bash implementation. It includes functions for:
@@ -21,7 +21,11 @@ from typing import List, Optional
 
 
 class MarkdownProcessor:
-    """Perform comprehensive transformations on markdown text and files."""
+    """Markdown processing and manipulation operations.
+    
+    This class performs comprehensive transformations on markdown text and files,
+    matching the original Bash implementation behavior exactly.
+    """
 
     # Regex patterns
     code_fence_re = re.compile(r"```.*?```", re.DOTALL)

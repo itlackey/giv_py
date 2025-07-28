@@ -7,7 +7,7 @@ requiring external API calls or keys.
 import pytest
 from unittest.mock import Mock, patch
 
-from giv.llm_utils import LLMClient
+from giv.lib.llm import LLMClient
 
 
 class TestLLMClient:

@@ -1,5 +1,5 @@
 """
-Client for communicating with a language model API.
+Language Model API client and utilities.
 
 This module provides comprehensive LLM integration that matches the Bash
 implementation exactly, including:
@@ -26,7 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """Enhanced language model client matching Bash implementation."""
+    """Enhanced language model client matching Bash implementation.
+    
+    This class provides a normalized interface to various LLM APIs,
+    with comprehensive error handling and configuration options.
+    """
 
     def __init__(
         self,

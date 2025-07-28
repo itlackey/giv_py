@@ -1,5 +1,5 @@
 """
-Output management utilities for giv.
+Output management and file writing utilities.
 
 This module provides comprehensive output management that matches the
 Bash implementation exactly, including:
@@ -22,7 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class OutputManager:
-    """Manage output modes and file modifications matching Bash behavior."""
+    """Output management and file writing operations.
+    
+    This class manages different output modes and file modification
+    strategies, matching the Bash implementation behavior exactly.
+    """
     
     def __init__(self, output_file: Optional[Union[str, Path]] = None,
                  output_mode: str = "auto",
@@ -266,6 +270,8 @@ def write_output(content: str, output_file: Optional[Union[str, Path]] = None,
                 output_mode: str = "auto", output_version: Optional[str] = None,
                 dry_run: bool = False) -> bool:
     """Convenience function for writing output.
+    
+    This function provides backward compatibility with the existing code.
     
     Parameters
     ----------
