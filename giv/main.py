@@ -29,9 +29,18 @@ def _preprocess_args(argv: list[str]) -> list[str]:
             config_pos = i
             break
     
-    # If we found 'config' and there's a next argument that's an operation
-    if config_pos >= 0 and config_pos + 1 < len(argv):
-        operation = argv[config_pos + 1]
+    if config_pos >= 0:
+        # If 'config' is the last argument, default to list
+        if config_pos + 1 >= len(argv):
+            return argv[:config_pos] + ["config", "--list"]
+        
+        # Check if already processed (next arg is a flag like --list, --get, etc.)
+        next_arg = argv[config_pos + 1]
+        if next_arg.startswith("--") and next_arg[2:] in {"list", "get", "set", "unset"}:
+            return argv  # Already processed, leave as-is
+        
+        # Check if next argument is an operation
+        operation = next_arg
         if operation in ["list", "get", "set", "unset"]:
             # Convert "config list" to "config --list", preserving preceding args
             new_argv = argv[:config_pos] + ["config", f"--{operation}"]
@@ -39,6 +48,29 @@ def _preprocess_args(argv: list[str]) -> list[str]:
             if config_pos + 2 < len(argv):
                 new_argv.extend(argv[config_pos + 2:])
             return new_argv
+        elif operation in ["--list", "--get", "--set", "--unset"]:
+            # Already in flag format - just add key handling for get/set/unset
+            new_argv = argv[:config_pos + 2]  # Keep "config --operation"
+            # Add remaining arguments
+            if config_pos + 2 < len(argv):
+                new_argv.extend(argv[config_pos + 2:])
+            return new_argv
+        else:
+            # Next argument is not an operation, could be:
+            # - "config <key>" -> get operation
+            # - "config <key> <value>" -> set operation
+            if config_pos + 2 < len(argv):
+                # There are 3+ args: config, key, value -> set operation
+                key = argv[config_pos + 1]
+                value = argv[config_pos + 2]
+                new_argv = argv[:config_pos] + ["config", "--set", key, value]
+                # Add any remaining arguments
+                if config_pos + 3 < len(argv):
+                    new_argv.extend(argv[config_pos + 3:])
+                return new_argv
+            else:
+                # Only 2 args: config, key -> get operation  
+                return argv[:config_pos] + ["config", "--get", operation]
     
     return argv
 
@@ -84,6 +116,9 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("Interrupted", file=sys.stderr)
         return 130
+    except Exception:
+        logger.exception("Unexpected error occurred")
+        return 1
 
 
 if __name__ == "__main__":

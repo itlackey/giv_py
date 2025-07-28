@@ -116,7 +116,7 @@ class TestDocumentGeneration:
         os.chdir(git_repo)
         
         try:
-            result = main(["message", "--dry-run"])
+            result = main(["--dry-run", "message"])
             assert result == 0
             
             captured = capsys.readouterr()
@@ -134,7 +134,7 @@ class TestDocumentGeneration:
         os.chdir(git_repo)
         
         try:
-            result = main(["summary", "--dry-run"])
+            result = main(["--dry-run", "summary"])
             assert result == 0
             
             captured = capsys.readouterr()
@@ -152,7 +152,7 @@ class TestDocumentGeneration:
         os.chdir(git_repo)
         
         try:
-            result = main(["changelog", "--dry-run"])
+            result = main(["--dry-run", "changelog"])
             assert result == 0
             
             captured = capsys.readouterr()  
@@ -170,7 +170,7 @@ class TestDocumentGeneration:
         os.chdir(git_repo)
         
         try:
-            result = main(["release-notes", "--dry-run"])
+            result = main(["--dry-run", "release-notes"])
             assert result == 0
             
             captured = capsys.readouterr()
@@ -188,7 +188,7 @@ class TestDocumentGeneration:
         os.chdir(git_repo)
         
         try:
-            result = main(["announcement", "--dry-run"])
+            result = main(["--dry-run", "announcement"])
             assert result == 0
             
             captured = capsys.readouterr()
@@ -273,7 +273,7 @@ class TestErrorHandling:
         
         try:
             # Use a nonexistent commit hash
-            result = main(["message", "nonexistent-commit", "--dry-run"])
+            result = main(["--dry-run", "message", "nonexistent-commit"])
             # Should handle gracefully (may succeed with empty diff or fail gracefully)
             assert result in [0, 1]
             
@@ -290,7 +290,7 @@ class TestGlobalFlags:
         os.chdir(git_repo)
         
         try:
-            result = main(["--verbose", "message", "--dry-run"])
+            result = main(["--verbose", "--dry-run", "message"])
             assert result == 0
             
             # Verbose mode should enable debug logging
@@ -350,7 +350,7 @@ class TestCommandAliases:
         os.chdir(git_repo)
         
         try:
-            result = main(["msg", "--dry-run"])
+            result = main(["--dry-run", "msg"])
             assert result == 0
             
             captured = capsys.readouterr()
@@ -373,7 +373,7 @@ class TestPathspecHandling:
         
         try:
             # Test with specific path
-            result = main(["message", "HEAD", "src/", "--dry-run"])
+            result = main(["--dry-run", "message", "HEAD", "src/"])
             assert result == 0
             
             # Should succeed regardless of pathspec

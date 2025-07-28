@@ -22,6 +22,9 @@ from typing import Any, Dict, Optional
 
 import requests
 
+from ..constants import DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, DEFAULT_API_TIMEOUT
+from ..errors import APIError
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,9 +40,9 @@ class LLMClient:
         api_url: Optional[str] = None,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
-        temperature: float = 0.9,
-        max_tokens: int = 8192,
-        timeout: int = 60,
+        temperature: float = DEFAULT_TEMPERATURE,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        timeout: int = DEFAULT_API_TIMEOUT,
         retries: int = 3,
     ) -> None:
         """Initialize LLM client with configuration.
@@ -115,10 +118,17 @@ class LLMClient:
             A mapping containing at least a ``content`` key with the
             generated text.
         """
-        if dry_run or not self.api_url:
+        # Validate prompt parameter
+        if prompt is None:
+            raise APIError("API error: Prompt cannot be None")
+        
+        if dry_run:
             # Dry-run mode: just echo the prompt
-            logger.debug("Dry-run mode or no API URL configured; returning prompt as output")
+            logger.debug("Dry-run mode; returning prompt as output")
             return {"content": prompt.strip()}
+        
+        if not self.api_url:
+            raise APIError("API error: No API URL configured")
 
         # Validate required configuration
         if not self.model:
@@ -137,6 +147,7 @@ class LLMClient:
                     time.sleep(2 ** attempt)  # Exponential backoff
                 else:
                     logger.error(f"All {self.retries} API request attempts failed")
+                    raise APIError(f"API error: {e}")
 
         return {"content": "Error: Failed to generate response after multiple attempts"}
 
@@ -189,7 +200,7 @@ class LLMClient:
             response_data = resp.json()
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response from API: {e}")
-            return {"content": "Error: Invalid JSON response from API"}
+            raise APIError("API error: Invalid JSON response")
 
         # Extract content from response
         content = self._extract_content(response_data)

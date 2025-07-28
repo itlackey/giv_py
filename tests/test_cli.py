@@ -26,7 +26,8 @@ def test_help_flag(capsys):
 
 def test_message_dry_run(capsys):
     # Without git, diff will be empty; ensure prompt prints at least header
-    ret = main(["message", "--dry-run"])
+    # Global args must come before subcommand
+    ret = main(["--dry-run", "message"])
     assert ret == 0
     captured = capsys.readouterr()
     output = captured.out.strip()

@@ -33,35 +33,35 @@ class TestPreprocessArgs:
         """Test preprocessing config list command."""
         args = ["config"]
         result = _preprocess_args(args)
-        assert result == ["config", "--action", "list"]
+        assert result == ["config", "--list"]
     
     def test_preprocess_args_config_get(self):
         """Test preprocessing config get command."""
         args = ["config", "api.url"]
         result = _preprocess_args(args)
-        assert result == ["config", "--action", "get", "--key", "api.url"]
+        assert result == ["config", "--get", "api.url"]
     
     def test_preprocess_args_config_set(self):
         """Test preprocessing config set command."""
         args = ["config", "api.url", "http://localhost:11434"]
         result = _preprocess_args(args)
-        assert result == ["config", "--action", "set", "--key", "api.url", "--value", "http://localhost:11434"]
+        assert result == ["config", "--set", "api.url", "http://localhost:11434"]
     
     def test_preprocess_args_config_unset(self):
         """Test preprocessing config unset command."""
         args = ["config", "--unset", "api.url"]
         result = _preprocess_args(args)
-        assert result == ["config", "--action", "unset", "--key", "api.url"]
+        assert result == ["config", "--unset", "api.url"]
     
     def test_preprocess_args_config_with_global_flags(self):
         """Test preprocessing config with global flags."""
         args = ["--verbose", "config", "api.url", "test"]
         result = _preprocess_args(args)
-        assert result == ["--verbose", "config", "--action", "set", "--key", "api.url", "--value", "test"]
+        assert result == ["--verbose", "config", "--set", "api.url", "test"]
     
     def test_preprocess_args_config_already_processed(self):
         """Test preprocessing already processed config arguments."""
-        args = ["config", "--action", "get", "--key", "api.url"]
+        args = ["config", "--get", "api.url"]
         result = _preprocess_args(args)
         assert result == args  # Should not modify already processed args
     
@@ -77,8 +77,8 @@ class TestPreprocessArgs:
         for args, expected_pos in test_cases:
             result = _preprocess_args(args)
             # Verify that config command was found and processed
-            assert "--action" in result
-            assert "--key" in result
+            assert "--get" in result or "--set" in result
+            assert any(key in result for key in ["--get", "--set"])
     
     def test_preprocess_args_config_edge_cases(self):
         """Test preprocessing config edge cases."""
@@ -90,7 +90,7 @@ class TestPreprocessArgs:
         # Config at end without arguments
         args = ["--verbose", "config"]
         result = _preprocess_args(args)
-        assert result == ["--verbose", "config", "--action", "list"]
+        assert result == ["--verbose", "config", "--list"]
 
 
 class TestMainFunction:
@@ -147,8 +147,8 @@ class TestMainFunction:
         assert result == 0
         # Verify preprocessed arguments were passed to parser
         call_args = mock_parser.parse_args.call_args[0][0]
-        assert '--action' in call_args
-        assert 'set' in call_args
+        assert '--set' in call_args
+        assert 'api.url' in call_args
     
     @patch('giv.main.run_command')
     @patch('giv.main.build_parser')
@@ -171,10 +171,9 @@ class TestMainFunction:
         mock_parser.parse_args.side_effect = SystemExit(2)  # argparse error
         mock_build_parser.return_value = mock_parser
         
-        with pytest.raises(SystemExit) as exc_info:
-            main(['--invalid-option'])
+        result = main(['--invalid-option'])
         
-        assert exc_info.value.code == 2
+        assert result == 1  # Parser errors are converted to return code 1
     
     @patch('giv.main.run_command')
     @patch('giv.main.build_parser')
@@ -198,13 +197,13 @@ class TestMainFunction:
 class TestMainIntegration:
     """Test main integration scenarios."""
     
-    @patch('giv.cli.run_command')
+    @patch('giv.main.run_command')
     def test_main_full_integration(self, mock_run_command):
         """Test main with full integration (real parser)."""
         mock_run_command.return_value = 0
         
         # Test actual argument parsing
-        result = main(['message', '--dry-run'])
+        result = main(['--dry-run', 'message'])
         
         assert result == 0
         # Verify run_command was called with parsed args
@@ -214,7 +213,7 @@ class TestMainIntegration:
         assert hasattr(args, 'dry_run')
         assert args.dry_run is True
     
-    @patch('giv.cli.run_command')
+    @patch('giv.main.run_command')
     def test_main_config_integration(self, mock_run_command):
         """Test main with config command integration."""
         mock_run_command.return_value = 0
@@ -224,11 +223,11 @@ class TestMainIntegration:
         assert result == 0
         args = mock_run_command.call_args[0][0]
         assert args.command == 'config'
-        assert args.action == 'set'
+        assert args.set is True  # Using individual flags now
         assert args.key == 'api.url'
         assert args.value == 'http://test:11434'
     
-    @patch('giv.cli.run_command')
+    @patch('giv.main.run_command')
     def test_main_error_codes(self, mock_run_command):
         """Test main returns correct error codes."""
         # Test different error codes
@@ -240,10 +239,10 @@ class TestMainIntegration:
     def test_main_sys_argv_usage(self):
         """Test main uses sys.argv correctly."""
         with patch('sys.argv', ['giv', 'message', '--help']):
-            with patch('giv.cli.run_command') as mock_run_command:
-                # --help should cause SystemExit before run_command is called
-                with pytest.raises(SystemExit):
-                    main()
+            with patch('giv.main.run_command') as mock_run_command:
+                # --help should cause main to return 0 (help was displayed)
+                result = main()
+                assert result == 0
                 
                 # run_command should not be called due to --help
                 mock_run_command.assert_not_called()
@@ -304,7 +303,7 @@ class TestMainEdgeCases:
     
     def test_main_empty_argv(self):
         """Test main with empty argv."""
-        with patch('giv.cli.run_command') as mock_run_command:
+        with patch('giv.main.run_command') as mock_run_command:
             mock_run_command.return_value = 0
             
             result = main([])
@@ -316,7 +315,7 @@ class TestMainEdgeCases:
     def test_main_none_argv(self):
         """Test main with None argv."""
         with patch('sys.argv', ['giv', 'message']):
-            with patch('giv.cli.run_command') as mock_run_command:
+            with patch('giv.main.run_command') as mock_run_command:
                 mock_run_command.return_value = 0
                 
                 result = main(None)
@@ -327,7 +326,7 @@ class TestMainEdgeCases:
                 assert args.command == 'message'
     
     @patch('giv.main._preprocess_args')
-    @patch('giv.cli.run_command')
+    @patch('giv.main.run_command')
     def test_main_preprocessing_none_result(self, mock_run_command, mock_preprocess):
         """Test main when preprocessing returns None."""
         mock_preprocess.return_value = None
@@ -343,7 +342,7 @@ class TestMainEdgeCases:
         """Test main with very long argument list."""
         long_argv = ['message'] + ['--verbose'] * 100 + ['HEAD~10']
         
-        with patch('giv.cli.run_command') as mock_run_command:
+        with patch('giv.main.run_command') as mock_run_command:
             mock_run_command.return_value = 0
             
             result = main(long_argv)
@@ -356,7 +355,7 @@ class TestMainEdgeCases:
         """Test main with unicode arguments."""
         unicode_args = ['message', '--output-file', 'commit_message_ñáéíóú.txt']
         
-        with patch('giv.cli.run_command') as mock_run_command:
+        with patch('giv.main.run_command') as mock_run_command:
             mock_run_command.return_value = 0
             
             result = main(unicode_args)

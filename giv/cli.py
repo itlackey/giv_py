@@ -34,12 +34,9 @@ logger = logging.getLogger(__name__)
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
     """Add common arguments that can appear after subcommands."""
-    parser.add_argument("--verbose", action="store_true", help="Enable debug/trace output")  
-    parser.add_argument("--dry-run", action="store_true", help="Preview only; don't write any files")
-    parser.add_argument("--output-mode", type=str, choices=["auto", "prepend", "append", "update", "overwrite", "none"], 
-                       help="Output mode: auto, prepend, append, update, overwrite, none")
-    parser.add_argument("--output-file", type=str, help="Write the output to the specified file instead of stdout")
-    return parser
+    # Note: --verbose, --dry-run, --output-mode, --output-file are defined globally
+    # to avoid argparse conflicts. This means they must come before the subcommand.
+    pass
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -174,65 +171,70 @@ def run_command(args: argparse.Namespace) -> int:
     int
         Exit code.
     """
-    # Set up logging if verbose mode enabled
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
+    from .errors import handle_error
     
-    # Preprocess global flags
-    if args.help and not args.command:
-        # Show top level help
-        build_parser().print_help()
-        return 0
-    if args.version and not args.command:
-        print(f"giv {__version__}")
-        return 0
+    try:
+        # Set up logging if verbose mode enabled
+        if args.verbose:
+            logging.basicConfig(level=logging.DEBUG)
+        
+        # Preprocess global flags
+        if args.help and not args.command:
+            # Show top level help
+            build_parser().print_help()
+            return 0
+        if args.version and not args.command:
+            print(f"giv {__version__}")
+            return 0
 
-    # Default to message command if no command specified
-    if not args.command:
-        args.command = "message"
+        # Default to message command if no command specified
+        if not args.command:
+            args.command = "message"
 
-    # Determine config file path
-    config_path = None
-    if args.config_file:
-        config_path = Path(args.config_file)
-    cfg_mgr = ConfigManager(config_path=config_path)
+        # Determine config file path
+        config_path = None
+        if args.config_file:
+            config_path = Path(args.config_file)
+        cfg_mgr = ConfigManager(config_path=config_path)
 
-    # Apply global configuration from args to environment
-    _apply_global_args(args, cfg_mgr)
+        # Apply global configuration from args to environment
+        _apply_global_args(args, cfg_mgr)
 
-    # Dispatch to subcommands
-    if args.command == "config":
-        return ConfigCommand(args, cfg_mgr).run()
-    elif args.command in ["message", "msg"]:
-        return MessageCommand(args, cfg_mgr).run()
-    elif args.command == "summary":
-        return SummaryCommand(args, cfg_mgr).run()
-    elif args.command == "document":
-        return DocumentCommand(args, cfg_mgr).run()
-    elif args.command == "changelog":
-        return ChangelogCommand(args, cfg_mgr).run()
-    elif args.command == "release-notes":
-        return ReleaseNotesCommand(args, cfg_mgr).run()
-    elif args.command == "announcement":
-        return AnnouncementCommand(args, cfg_mgr).run()
-    elif args.command == "available-releases":
-        return _run_available_releases(args, cfg_mgr)
-    elif args.command == "update":
-        return _run_update(args, cfg_mgr)
-    elif args.command == "init":
-        return _run_init(args, cfg_mgr)
-    elif args.command == "version":
-        print(f"giv {__version__}")
-        return 0
-    elif args.command == "help":
-        # Delegate help to specific command if provided
-        build_parser().print_help()
-        return 0
-    else:
-        # Unknown command
-        print(f"Error: Unknown subcommand '{args.command}'.", file=sys.stderr)
-        print("Use -h or --help for usage information.", file=sys.stderr)
-        return 1
+        # Dispatch to subcommands
+        if args.command == "config":
+            return ConfigCommand(args, cfg_mgr).run()
+        elif args.command in ["message", "msg"]:
+            return MessageCommand(args, cfg_mgr).run()
+        elif args.command == "summary":
+            return SummaryCommand(args, cfg_mgr).run()
+        elif args.command == "document":
+            return DocumentCommand(args, cfg_mgr).run()
+        elif args.command == "changelog":
+            return ChangelogCommand(args, cfg_mgr).run()
+        elif args.command == "release-notes":
+            return ReleaseNotesCommand(args, cfg_mgr).run()
+        elif args.command == "announcement":
+            return AnnouncementCommand(args, cfg_mgr).run()
+        elif args.command == "available-releases":
+            return _run_available_releases(args, cfg_mgr)
+        elif args.command == "update":
+            return _run_update(args, cfg_mgr)
+        elif args.command == "init":
+            return _run_init(args, cfg_mgr)
+        elif args.command == "version":
+            print(f"giv {__version__}")
+            return 0
+        elif args.command == "help":
+            # Delegate help to specific command if provided
+            build_parser().print_help()
+            return 0
+        else:
+            # Unknown command
+            print(f"Error: Unknown subcommand '{args.command}'.", file=sys.stderr)
+            print("Use -h or --help for usage information.", file=sys.stderr)
+            return 1
+    except (KeyboardInterrupt, Exception) as e:
+        return handle_error(e)
 
 
 def _apply_global_args(args: argparse.Namespace, cfg_mgr: ConfigManager) -> None:

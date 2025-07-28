@@ -35,15 +35,38 @@ class TemplateEngine:
             Custom template directory to search in addition to standard locations
         """
         self.template_dir = template_dir
+        self._base_template_dir: Optional[Path] = None
+
+    @property
+    def base_template_dir(self) -> Path:
+        """Get the base (system) template directory."""
+        if self._base_template_dir is not None:
+            return self._base_template_dir
+        return Path(__file__).parent.parent / TEMPLATES_DIR
+
+    @base_template_dir.setter
+    def base_template_dir(self, value: Path) -> None:
+        """Set the base template directory (mainly for testing)."""
+        self._base_template_dir = value
+
+    @base_template_dir.deleter
+    def base_template_dir(self) -> None:
+        """Delete the base template directory override."""
+        self._base_template_dir = None
+
+    def find_template_file(self, template_name: str) -> Path:
+        """Alias for find_template() for backwards compatibility."""
+        return self.find_template(template_name)
 
     def find_template(self, template_name: str) -> Path:
         """Find template file using Bash-compatible search hierarchy.
         
         Search order:
         1. Explicit path (if template_name is absolute/relative path)
-        2. Project-level .giv/templates/
-        3. User-level ~/.giv/templates/
-        4. System templates (bundled with package)
+        2. Custom template directory (if provided)
+        3. Project-level .giv/templates/
+        4. User-level ~/.giv/templates/
+        5. System templates (bundled with package)
         
         Parameters
         ----------
@@ -67,7 +90,13 @@ class TemplateEngine:
                 return template_path
             raise TemplateError(f"Template not found: {template_path}")
 
-        # 2. Check project-level .giv/templates/
+        # 2. Check custom template directory if provided (highest precedence)
+        if self.template_dir:
+            custom_template = self.template_dir / template_name
+            if custom_template.exists():
+                return custom_template
+
+        # 3. Check project-level .giv/templates/
         current_dir = Path.cwd()
         while current_dir != current_dir.parent:
             project_templates = current_dir / ".giv" / "templates" / template_name
@@ -75,22 +104,16 @@ class TemplateEngine:
                 return project_templates
             current_dir = current_dir.parent
 
-        # 3. Check user-level ~/.giv/templates/
+        # 4. Check user-level ~/.giv/templates/
         home = Path.home()
         user_templates = home / ".giv" / "templates" / template_name
         if user_templates.exists():
             return user_templates
 
-        # 4. Check system templates (bundled with package)
-        system_templates = Path(__file__).parent.parent / TEMPLATES_DIR / template_name
+        # 5. Check system templates (bundled with package)
+        system_templates = self.base_template_dir / template_name
         if system_templates.exists():
             return system_templates
-
-        # 5. Check custom template directory if provided
-        if self.template_dir:
-            custom_template = self.template_dir / template_name
-            if custom_template.exists():
-                return custom_template
 
         raise TemplateError(f"Template not found: {template_name}")
 
@@ -113,12 +136,15 @@ class TemplateEngine:
             If template cannot be found
         """
         template_path = self.find_template(template_name)
-        return template_path.read_text(encoding="utf-8")
+        try:
+            return template_path.read_text(encoding="utf-8")
+        except (OSError, IOError, PermissionError) as e:
+            raise TemplateError(f"Template not found: {e}")
 
     def render_template(self, template_content: str, context: Dict[str, Any]) -> str:
         """Render template by replacing tokens with context values.
         
-        Supports both {{TOKEN}} and [TOKEN] formats for compatibility.
+        Supports {TOKEN} and [TOKEN] formats for compatibility.
         Unknown tokens are left intact.
         
         Parameters
@@ -135,20 +161,32 @@ class TemplateEngine:
         """
         result = template_content
         
-        # Replace {{TOKEN}} format (primary format)
+        # Replace {TOKEN} format (single brace) - but not double braces
         for key, value in context.items():
             if value is None:
-                value = ""
+                value = "None"
             elif not isinstance(value, str):
                 value = str(value)
             
-            token_pattern = f"{{{{{key}}}}}"
-            result = result.replace(token_pattern, value)
+            # Only replace single braces that are not part of double braces
+            token_pattern = f"{{{key}}}"
+            double_brace_pattern = f"{{{{{key}}}}}"
+            
+            # Use a more careful replacement that avoids double braces
+            # First, temporarily replace double brace patterns with placeholders
+            placeholder = f"__DOUBLE_BRACE_{key}_PLACEHOLDER__"
+            temp_result = result.replace(double_brace_pattern, placeholder)
+            
+            # Replace single brace patterns
+            temp_result = temp_result.replace(token_pattern, value)
+            
+            # Restore double brace patterns
+            result = temp_result.replace(placeholder, double_brace_pattern)
         
         # Replace [TOKEN] format (legacy compatibility)
         for key, value in context.items():
             if value is None:
-                value = ""
+                value = "None"
             elif not isinstance(value, str):
                 value = str(value)
             
@@ -188,18 +226,29 @@ class TemplateEngine:
         Dict[str, Any]
             Validation results including found tokens and any issues
         """
-        # Find all {{TOKEN}} patterns
-        double_brace_tokens = re.findall(r'\{\{([^}]+)\}\}', template_content)
+        # Find all {TOKEN} patterns (single brace) - exclude double braces
+        single_brace_tokens = re.findall(r'(?<!\{)\{([^{}]+)\}(?!\})', template_content)
         
         # Find all [TOKEN] patterns
         square_bracket_tokens = re.findall(r'\[([^]]+)\]', template_content)
         
+        # Combine all tokens while preserving order and removing duplicates
+        all_tokens = []
+        seen = set()
+        for token in single_brace_tokens + square_bracket_tokens:
+            if token not in seen:
+                all_tokens.append(token)
+                seen.add(token)
+        
         return {
-            "double_brace_tokens": double_brace_tokens,
+            "single_brace_tokens": single_brace_tokens,
             "square_bracket_tokens": square_bracket_tokens,
-            "all_tokens": list(set(double_brace_tokens + square_bracket_tokens)),
-            "is_valid": True,  # Basic validation - could be enhanced
-            "errors": []
+            "tokens": all_tokens,
+            "all_tokens": all_tokens,  # Keep for backward compatibility
+            "valid": True,  # Basic validation - could be enhanced
+            "is_valid": True,  # Keep for backward compatibility
+            "issues": [],
+            "errors": []  # Keep for backward compatibility
         }
 
     def list_available_templates(self) -> Dict[str, Path]:
@@ -213,7 +262,7 @@ class TemplateEngine:
         templates = {}
         
         # System templates
-        system_templates_dir = Path(__file__).parent.parent / TEMPLATES_DIR
+        system_templates_dir = self.base_template_dir
         if system_templates_dir.exists():
             for template_file in system_templates_dir.glob("*.md"):
                 templates[template_file.name] = template_file
