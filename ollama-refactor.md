@@ -28,10 +28,8 @@ The current `LLMClient` implementation already uses a unified approach with Open
 - [ ] Update remaining test method names and descriptions to be API-agnostic
 
 ### 3. Documentation Changes
-- [ ] Update `docs/configuration.md` - remove "Local Ollama Setup" section
 - [ ] Update `docs/installation.md` - remove Ollama requirement
 - [ ] Update `docs/architecture.md` - remove Ollama references
-- [ ] Update `README.md` - remove Ollama-specific examples and references
 
 ### 4. Known Issues Cleanup
 - [ ] Remove Ollama-related entries from `known-issues.md`
@@ -56,11 +54,7 @@ The current `LLMClient` implementation already uses a unified approach with Open
 - Ollama URL building tests (already skipped)
 - `test_full_ollama_workflow` (lines 432-470+)
 
-### File: `docs/configuration.md`
 
-**Sections to modify:**
-- Line 18: Remove "(OpenAI, Ollama, etc.)" - change to "(OpenAI, etc.)"
-- Lines 100-104: Remove entire "Local Ollama Setup" section
 
 ### File: `docs/installation.md`
 
@@ -71,13 +65,6 @@ The current `LLMClient` implementation already uses a unified approach with Open
 
 **Lines to modify:**
 - Line 132: Remove Ollama references from llm.sh description
-- Line 161: Remove Ollama from optional dependencies list
-
-### File: `README.md`
-
-**Lines to modify:**
-- Line 12: Change "OpenAI, Anthropic, Ollama, and custom endpoints" to "OpenAI, Anthropic, and custom endpoints"
-- Lines 218+: Remove "Local Models (Ollama)" section
 
 ### File: `known-issues.md`
 
@@ -95,10 +82,9 @@ After implementing changes:
 
 ## Acceptance Criteria
 
-- [ ] All `grep -r "ollama"` searches return only README historical references (if any)
 - [ ] All `grep -r "detect_api_type"` searches return no results
 - [ ] All tests pass
-- [ ] Documentation is consistent and doesn't mention Ollama as special case
+- [ ] Documentation is consistent and provides details of using Ollama via the OpenAI API
 - [ ] LLMClient works uniformly with all API endpoints
 - [ ] No special case logic remains for different API types
 

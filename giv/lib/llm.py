@@ -155,21 +155,12 @@ class LLMClient:
         """Make a single API request."""
         # Prepare request data
         headers = {"Content-Type": "application/json"}
+
+        if self.api_url and ("localhost" in self.api_url or "127.0.0.1" in self.api_url) and not self.api_key:
+            self.api_key = "giv"  # Use 'giv' as the key for local services
         
-        # Check if we need authorization header (skip for localhost)
-        needs_auth = (
-            self.api_key
-            and self.api_key not in ("giv",)
-            and self.api_url
-            and "localhost" not in self.api_url
-            and "127.0.0.1" not in self.api_url
-        )
-        
-        if needs_auth:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-            logger.debug("Using Authorization header with API key")
-        else:
-            logger.debug("Skipping Authorization header (local service detected)")
+        headers["Authorization"] = f"Bearer {self.api_key}"
+        logger.debug(f"Using Authorization header with API key: {self.api_key}")
 
         # Prepare request body (OpenAI ChatCompletion format)
         data = {

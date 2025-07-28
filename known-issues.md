@@ -11,24 +11,10 @@
 
 **Resolution:** This is the intended behavior for argparse with subcommands, so tests were updated accordingly.
 
-## LLMClient API Detection Tests
-**Description:** Tests for `LLMClient._detect_api_type()` method are failing because this method no longer exists in the current implementation.
-
-**Tests Affected:**
-- `test_detect_api_type_ollama`
-- `test_detect_api_type_openai` 
-- `test_detect_api_type_unknown`
-- `test_detect_api_type_invalid_url`
-
-**Resolution:** These tests have been skipped as the API detection logic has been removed or changed in the current implementation.
-
 ## LLMClient URL Building Tests
 **Description:** Tests for `LLMClient._build_url()` method are failing because this method no longer exists in the current implementation.
 
 **Tests Affected:**
-- `test_build_url_ollama_basic`
-- `test_build_url_ollama_with_path`
-- `test_build_url_ollama_with_trailing_slash`
 - `test_build_url_openai`
 - `test_build_url_openai_base`
 

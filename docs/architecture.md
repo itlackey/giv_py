@@ -129,7 +129,7 @@ The `config.py` module implements Git-style configuration:
 
 ### LLM Integration
 
-**llm.sh** handles JSON-escaping (`json_escape`), remote API calls (`generate_remote` via curl), local inference (`run_local` via Ollama), response parsing (`extract_content_from_response`), and high-level `generate_response`, along with prompt token replacement (`replace_tokens`), prompt building (`build_prompt`), and execution (`generate_from_prompt`). It includes robust error handling and a fallback to `jq` for JSON parsing ([llm.sh][6]).
+**llm.py** handles JSON-escaping (`json_escape`), remote API calls (`generate_remote` via curl), local inference (`run_local`), response parsing (`extract_content_from_response`), and high-level `generate_response`, along with prompt token replacement (`replace_tokens`), prompt building (`build_prompt`), and execution (`generate_from_prompt`). It includes robust error handling and a fallback to `jq` for JSON parsing ([llm.sh][6]).
 
 ### Centralized Metadata Retrieval
 
@@ -158,7 +158,7 @@ Each subcommand in the `giv` CLI is implemented as a separate `.sh` script locat
 4. **Execution Flow and Error Handling**:
    - The main `giv.sh` script identifies the subcommand and executes the corresponding `.sh` file from the `commands` folder.
    - If the subcommand script is not found, an error message is displayed with a list of available subcommands.
-   - All subcommands now include improved error handling: missing dependencies, invalid config, or failed AI calls are surfaced to the user with clear messages and exit codes. Optional dependencies (e.g., Glow, Ollama, GitHub CLI) are checked at runtime, and warnings are issued if unavailable.
+   - All subcommands now include improved error handling: missing dependencies, invalid config, or failed AI calls are surfaced to the user with clear messages and exit codes. Optional dependencies (e.g., Glow, GitHub CLI) are checked at runtime, and warnings are issued if unavailable.
 
 This modular structure ensures that each subcommand is self-contained and easy to maintain, while shared functionality is centralized for reuse. The ongoing migration aims to further unify subcommand logic and reduce duplication.
 ## Testing and Error Handling
