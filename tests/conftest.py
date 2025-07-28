@@ -9,10 +9,9 @@ the Python implementation of giv CLI. It includes utilities for:
 - Comparing output with Bash implementation
 """
 import os
-import shutil
 import tempfile
 from pathlib import Path
-from typing import Generator, Dict, Any
+from typing import Generator, Dict
 import subprocess
 import pytest
 
@@ -274,6 +273,216 @@ def clean_environment():
     # Restore original values
     for var, value in original_env.items():
         os.environ[var] = value
+
+
+# Enhanced fixtures for improved test isolation
+
+def setup_initial_repo_state(repo_dir: Path) -> None:
+    """Setup consistent initial repository state for all tests."""
+    # Create realistic project structure
+    (repo_dir / "package.json").write_text("""{
+  "name": "test-project",
+  "version": "1.2.0",
+  "description": "A test project for integration testing",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo 'test'"
+  }
+}""")
+    
+    (repo_dir / "README.md").write_text("""# Test Project
+
+This is a test project for integration testing.
+
+## Features
+
+- Feature A
+- Feature B
+""")
+    
+    (repo_dir / "CHANGELOG.md").write_text("""# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+## [1.2.0] - 2023-01-01
+- Initial release
+""")
+    
+    # Create some source files
+    src_dir = repo_dir / "src"
+    src_dir.mkdir()
+    
+    (src_dir / "index.js").write_text("""console.log('Hello, world!');
+
+function add(a, b) {
+    return a + b;
+}
+
+module.exports = { add };
+""")
+    
+    (src_dir / "utils.js").write_text("""function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+module.exports = { formatDate };
+""")
+    
+    # Initial commit
+    subprocess.run(["git", "add", "."], cwd=repo_dir, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_dir, check=True)
+
+
+def create_test_files(repo_dir: Path, files: Dict[str, str]) -> None:
+    """Create test files with specified content."""
+    for file_path, content in files.items():
+        full_path = repo_dir / file_path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text(content)
+
+
+def commit_changes(repo_dir: Path, message: str) -> str:
+    """Commit current changes and return commit hash."""
+    subprocess.run(["git", "add", "."], cwd=repo_dir, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", message], 
+        cwd=repo_dir, 
+        check=True,
+        capture_output=True,
+        text=True
+    )
+    
+    # Get the commit hash
+    hash_result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    return hash_result.stdout.strip()
+
+
+@pytest.fixture
+def isolated_git_repo(temp_dir: Path) -> Generator[Path, None, None]:
+    """Create an isolated git repository with consistent history for each test.
+    
+    This fixture:
+    - Creates a unique temporary Git repository for each test
+    - Initializes it with consistent configuration and initial state
+    - Changes to the repository directory for the test duration
+    - Automatically restores the original directory on cleanup
+    """
+    repo_dir = temp_dir / "test_repo"
+    repo_dir.mkdir()
+    
+    # Initialize git repo with consistent config
+    subprocess.run(["git", "init", "-q"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True)
+    
+    # Create consistent initial state
+    setup_initial_repo_state(repo_dir)
+    
+    # Set as working directory for the test
+    old_cwd = os.getcwd()
+    os.chdir(repo_dir)
+    
+    try:
+        yield repo_dir
+    finally:
+        os.chdir(old_cwd)
+
+
+@pytest.fixture
+def working_directory(temp_dir: Path) -> Generator[Path, None, None]:
+    """Change to a temporary directory for the duration of the test.
+    
+    This fixture:
+    - Changes to a unique temporary directory for each test
+    - Automatically restores the original directory on cleanup
+    - Provides complete isolation from the project directory
+    """
+    old_cwd = os.getcwd()
+    os.chdir(temp_dir)
+    
+    try:
+        yield temp_dir
+    finally:
+        os.chdir(old_cwd)
+
+
+@pytest.fixture
+def isolated_config_manager(temp_dir: Path) -> ConfigManager:
+    """Create a ConfigManager completely isolated in temp directory.
+    
+    This fixture:
+    - Creates a .giv directory in the temp directory
+    - Sets up a test configuration file
+    - Returns a ConfigManager instance pointing to the isolated config
+    """
+    config_dir = temp_dir / ".giv"
+    config_dir.mkdir()
+    
+    config_file = config_dir / "config"
+    config_file.write_text("""# Test configuration
+api.url=https://api.example.test
+api.key=test-key-12345
+temperature=0.7
+max_tokens=4096
+""")
+    
+    return ConfigManager(config_path=config_file)
+
+
+@pytest.fixture
+def repo_with_changes(isolated_git_repo: Path) -> Path:
+    """Create an isolated Git repository with unstaged changes."""
+    # Add unstaged changes
+    create_test_files(isolated_git_repo, {
+        "src/new_file.js": "// New file\nconsole.log('new');",
+        "modified_file.txt": "This file has been modified"
+    })
+    
+    # Modify existing file
+    with open(isolated_git_repo / "src" / "index.js", "a") as f:
+        f.write("\n// Added line\n")
+    
+    return isolated_git_repo
+
+
+@pytest.fixture
+def repo_with_staged_changes(isolated_git_repo: Path) -> Path:
+    """Create an isolated Git repository with staged changes."""
+    # Add staged changes
+    create_test_files(isolated_git_repo, {
+        "src/staged.js": "// Staged file\nconsole.log('staged');",
+        "staged_file.txt": "This file has been staged"
+    })
+    
+    subprocess.run(["git", "add", "."], cwd=isolated_git_repo, check=True)
+    
+    return isolated_git_repo
+
+
+@pytest.fixture
+def repo_with_commits(isolated_git_repo: Path) -> Path:
+    """Create an isolated Git repository with multiple commits."""
+    # Create first additional commit
+    create_test_files(isolated_git_repo, {
+        "feature1.js": "// Feature 1\nconsole.log('feature1');",
+    })
+    commit_changes(isolated_git_repo, "Add feature 1")
+    
+    # Create second additional commit
+    create_test_files(isolated_git_repo, {
+        "feature2.js": "// Feature 2\nconsole.log('feature2');",
+    })
+    commit_changes(isolated_git_repo, "Add feature 2")
+    
+    return isolated_git_repo
 
 
 # Parametrized fixtures for different test scenarios

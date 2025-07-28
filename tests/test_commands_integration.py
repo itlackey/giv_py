@@ -4,8 +4,6 @@ Comprehensive integration tests for all command modules.
 Tests command execution, error handling, and edge cases for each command.
 """
 import argparse
-import tempfile
-from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import pytest
 
@@ -422,6 +420,40 @@ class TestConfigCommandIntegration:
         result = cmd.run()
         
         assert result == 0  # Should succeed with list action
+
+
+class TestConfigCommandIsolated:
+    """Integration tests for ConfigCommand using isolated configuration."""
+    
+    def test_config_command_with_isolated_manager(self, basic_args, isolated_config_manager):
+        """Test config command with fully isolated configuration."""
+        # Verify initial state
+        initial_config = isolated_config_manager.list()
+        assert "api.url" in initial_config
+        assert initial_config["api.url"] == "https://api.example.test"
+        
+        # Set flag-style attributes for config command
+        basic_args.list = False
+        basic_args.get = False
+        basic_args.set = True
+        basic_args.unset = False
+        basic_args.key = "test.isolation"
+        basic_args.value = "working"
+        
+        cmd = ConfigCommand(basic_args, isolated_config_manager)
+        result = cmd.run()
+        
+        assert result == 0
+        assert isolated_config_manager.get("test.isolation") == "working"
+    
+    def test_config_isolation_between_tests(self, basic_args, isolated_config_manager):
+        """Test that configuration is properly isolated between tests."""
+        # This test should not see changes from the previous test
+        config = isolated_config_manager.list()
+        
+        # Should have default test config, not modifications from other tests
+        assert "test.isolation" not in config
+        assert config["api.url"] == "https://api.example.test"
 
 
 class TestCommandErrorHandling:

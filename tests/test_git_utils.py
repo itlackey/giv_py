@@ -24,64 +24,43 @@ class TestGitHistory:
         gh = GitHistory()
         assert gh is not None
     
-    def test_get_diff_current(self, git_repo):
+    def test_get_diff_current(self, isolated_git_repo):
         """Test getting diff for current changes."""
-        old_cwd = os.getcwd()
-        os.chdir(git_repo)
+        # Add some changes - working directory is already set to isolated_git_repo
+        (isolated_git_repo / "src" / "new_file.js").write_text("console.log('new file');")
         
-        try:
-            # Add some changes
-            (git_repo / "src" / "new_file.js").write_text("console.log('new file');")
-            
-            gh = GitHistory()
-            diff = gh.get_diff(revision="--current")
-            
-            # Should contain the new file
-            assert "new_file.js" in diff
-            assert "console.log('new file');" in diff
-            
-        finally:
-            os.chdir(old_cwd)
+        gh = GitHistory()
+        diff = gh.get_diff(revision="--current")
+        
+        # Should contain the new file
+        assert "new_file.js" in diff
+        assert "console.log('new file');" in diff
     
-    def test_get_diff_cached(self, git_repo):
+    def test_get_diff_cached(self, isolated_git_repo):
         """Test getting diff for staged changes."""
-        old_cwd = os.getcwd()
-        os.chdir(git_repo)
+        # Add and stage some changes - working directory is already set
+        (isolated_git_repo / "src" / "staged.js").write_text("console.log('staged');")
+        subprocess.run(["git", "add", "src/staged.js"], cwd=isolated_git_repo, check=True)
         
-        try:
-            # Add and stage some changes
-            (git_repo / "src" / "staged.js").write_text("console.log('staged');")
-            subprocess.run(["git", "add", "src/staged.js"], cwd=git_repo, check=True)
-            
-            gh = GitHistory()
-            diff = gh.get_diff(revision="--cached")
-            
-            # Should contain the staged file
-            assert "staged.js" in diff
-            assert "console.log('staged');" in diff
-            
-        finally:
-            os.chdir(old_cwd)
+        gh = GitHistory()
+        diff = gh.get_diff(revision="--cached")
+        
+        # Should contain the staged file
+        assert "staged.js" in diff
+        assert "console.log('staged');" in diff
     
-    def test_get_diff_head(self, git_repo):
+    def test_get_diff_head(self, isolated_git_repo):
         """Test getting diff for HEAD."""
-        old_cwd = os.getcwd()
-        os.chdir(git_repo)
+        # Make another commit - working directory is already set
+        (isolated_git_repo / "src" / "second.js").write_text("console.log('second');")
+        subprocess.run(["git", "add", "."], cwd=isolated_git_repo, check=True)
+        subprocess.run(["git", "commit", "-m", "Second commit"], cwd=isolated_git_repo, check=True)
         
-        try:
-            # Make another commit
-            (git_repo / "src" / "second.js").write_text("console.log('second');")
-            subprocess.run(["git", "add", "."], cwd=git_repo, check=True)
-            subprocess.run(["git", "commit", "-m", "Second commit"], cwd=git_repo, check=True)
-            
-            gh = GitHistory()
-            diff = gh.get_diff(revision="HEAD~1..HEAD")
-            
-            # Should contain the new file from second commit
-            assert "second.js" in diff
-            
-        finally:
-            os.chdir(old_cwd)
+        gh = GitHistory()
+        diff = gh.get_diff(revision="HEAD~1..HEAD")
+        
+        # Should contain the new file from second commit
+        assert "second.js" in diff
     
     def test_get_diff_with_paths(self, git_repo):
         """Test getting diff with path filtering."""

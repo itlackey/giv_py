@@ -45,42 +45,39 @@ class TestWriteOutputBasic:
 class TestWriteOutputToFile:
     """Test write_output to file functionality."""
     
-    def test_write_output_overwrite_mode(self):
+    def test_write_output_overwrite_mode(self, working_directory):
         """Test overwrite mode creates new file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = Path(tmpdir) / "test.txt"
-            
-            result = write_output("test content", str(output_file), "overwrite")
-            
-            assert result is True
-            assert output_file.exists()
-            assert output_file.read_text().strip() == "test content"
+        output_file = working_directory / "test.txt"
+        
+        result = write_output("test content", str(output_file), "overwrite")
+        
+        assert result is True
+        assert output_file.exists()
+        assert output_file.read_text().strip() == "test content"
     
-    def test_write_output_append_mode(self):
+    def test_write_output_append_mode(self, working_directory):
         """Test append mode adds to existing file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = Path(tmpdir) / "test.txt"
-            output_file.write_text("existing content\n")
-            
-            result = write_output("new content", str(output_file), "append")
-            
-            assert result is True
-            content = output_file.read_text()
-            assert "existing content" in content
-            assert "new content" in content
+        output_file = working_directory / "test.txt"
+        output_file.write_text("existing content\n")
+        
+        result = write_output("new content", str(output_file), "append")
+        
+        assert result is True
+        content = output_file.read_text()
+        assert "existing content" in content
+        assert "new content" in content
     
-    def test_write_output_prepend_mode(self):
+    def test_write_output_prepend_mode(self, working_directory):
         """Test prepend mode adds to beginning of file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = Path(tmpdir) / "test.txt"
-            output_file.write_text("existing content")
-            
-            result = write_output("new content", str(output_file), "prepend")
-            
-            assert result is True
-            content = output_file.read_text()
-            assert content.startswith("new content")
-            assert "existing content" in content
+        output_file = working_directory / "test.txt"
+        output_file.write_text("existing content")
+        
+        result = write_output("new content", str(output_file), "prepend")
+        
+        assert result is True
+        content = output_file.read_text()
+        assert content.startswith("new content")
+        assert "existing content" in content
     
     def test_write_output_auto_mode_new_file(self):
         """Test auto mode with new file defaults to overwrite."""
