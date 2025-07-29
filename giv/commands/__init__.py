@@ -16,6 +16,8 @@ from .release_notes import ReleaseNotesCommand
 from .announcement import AnnouncementCommand
 from .config import ConfigCommand
 from .init import InitCommand
+from .help import HelpCommand
+from .version import VersionCommand
 
 __all__ = [
     'BaseCommand',
@@ -27,4 +29,6 @@ __all__ = [
     'AnnouncementCommand',
     'ConfigCommand',
     'InitCommand',
+    'HelpCommand',
+    'VersionCommand',
 ]

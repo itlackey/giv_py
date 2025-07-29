@@ -20,17 +20,26 @@ DEFAULT_CHANGELOG_FILE = "CHANGELOG.md"
 DEFAULT_RELEASE_NOTES_FILE = "RELEASE_NOTES.md"
 DEFAULT_ANNOUNCEMENT_FILE = "ANNOUNCEMENT.md"
 
-# Configuration keys
-CONFIG_API_URL = "api_url"
-CONFIG_API_KEY = "api_key"
-CONFIG_API_MODEL = "api_model"
-CONFIG_TEMPERATURE = "temperature"
-CONFIG_MAX_TOKENS = "max_tokens"
-CONFIG_OUTPUT_MODE = "output_mode"
-CONFIG_OUTPUT_VERSION = "output_version"
-CONFIG_CHANGELOG_FILE = "changelog_file"
-CONFIG_RELEASE_NOTES_FILE = "release_notes_file"
-CONFIG_ANNOUNCEMENT_FILE = "announcement_file"
+# Configuration keys (using dot notation as per specification)
+CONFIG_API_URL = "api.url"
+CONFIG_API_KEY = "api.key"
+CONFIG_API_MODEL = "api.model.name"
+CONFIG_TEMPERATURE = "api.model.temperature"
+CONFIG_MAX_TOKENS = "api.model.max_tokens"
+CONFIG_API_TIMEOUT = "api.model.timeout"
+CONFIG_PROJECT_TITLE = "project.title"
+CONFIG_PROJECT_DESCRIPTION = "project.description"
+CONFIG_PROJECT_URL = "project.url"
+CONFIG_PROJECT_TYPE = "project.type"
+CONFIG_TODO_FILE = "todo.file"
+CONFIG_TODO_PATTERN = "todo.pattern"
+CONFIG_VERSION_FILE = "version.file"
+CONFIG_VERSION_PATTERN = "version.pattern"
+CONFIG_OUTPUT_MODE = "output.mode"
+CONFIG_OUTPUT_VERSION = "output_version"  # Keep legacy naming for this one
+CONFIG_CHANGELOG_FILE = "changelog.file"
+CONFIG_RELEASE_NOTES_FILE = "release_notes_file"  # Keep legacy naming
+CONFIG_ANNOUNCEMENT_FILE = "announcement_file"    # Keep legacy naming
 
 # Git revision defaults
 DEFAULT_REVISION = "--current"

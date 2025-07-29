@@ -2,7 +2,7 @@
 
 **Target**: 100% compliance with `app-spec.md`  
 **Review Reference**: `app-spec-review.md`  
-**Progress**: 0/25 completed
+**Progress**: 12/25 completed
 
 ## 🚨 High Priority (Critical Implementation Required)
 
@@ -27,10 +27,12 @@
 - [x] **2.1** Implement `giv init` command class  
   *Reference: app-spec.md Section 3.8, app-spec-review.md line 94-96*  
   *Status: ✅ Implemented - Created InitCommand class, copies templates, creates config*
-- [ ] **2.2** Create dedicated `help [command]` command implementation  
-  *Reference: app-spec.md Section 3.9, app-spec-review.md line 102*
-- [ ] **2.3** Enhance `version` command with proper command class  
-  *Reference: app-spec.md Section 3.9, app-spec-review.md line 101*
+- [x] **2.2** Create dedicated `help [command]` command implementation  
+  *Reference: app-spec.md Section 3.9, app-spec-review.md line 102*  
+  *Status: ✅ Implemented - Created HelpCommand class with general and command-specific help*
+- [x] **2.3** Enhance `version` command with proper command class  
+  *Reference: app-spec.md Section 3.9, app-spec-review.md line 101*  
+  *Status: ✅ Implemented - Enhanced VersionCommand with detailed system info in --verbose mode*
 
 ### 3. Template Variables Implementation
 - [x] **3.1** Add `{SHORT_COMMIT_ID}` variable support  
@@ -46,10 +48,12 @@
 ## ⚠️ Medium Priority (Compliance Issues)
 
 ### 4. Configuration System Alignment
-- [ ] **4.1** Fix configuration hierarchy to match specification  
-  *Reference: app-spec.md Section 4.1, app-spec-review.md line 71-76*
-- [ ] **4.2** Validate and align configuration key names with specification  
-  *Reference: app-spec.md Section 3.7, app-spec-review.md line 90-93*
+- [x] **4.1** Fix configuration hierarchy to match specification  
+  *Reference: app-spec.md Section 4.1, app-spec-review.md line 71-76*  
+  *Status: ✅ Fixed - Config files now take precedence over environment variables*
+- [x] **4.2** Validate and align configuration key names with specification  
+  *Reference: app-spec.md Section 3.7, app-spec-review.md line 90-93*  
+  *Status: ✅ Updated - Constants now use dot notation (api.url, api.model.name, etc.)*
 
 ### 5. Command Line Interface Alignment
 - [ ] **5.1** Evaluate command option placement vs specification  

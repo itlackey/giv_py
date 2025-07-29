@@ -95,23 +95,23 @@ class TestConfigurationKeys:
     
     def test_api_config_keys(self):
         """Test API configuration keys."""
-        assert CONFIG_API_URL == "api_url"
-        assert CONFIG_API_KEY == "api_key"
-        assert CONFIG_API_MODEL == "api_model"
+        assert CONFIG_API_URL == "api.url"
+        assert CONFIG_API_KEY == "api.key"
+        assert CONFIG_API_MODEL == "api.model.name"
     
     def test_llm_config_keys(self):
         """Test LLM configuration keys."""
-        assert CONFIG_TEMPERATURE == "temperature"
-        assert CONFIG_MAX_TOKENS == "max_tokens"
+        assert CONFIG_TEMPERATURE == "api.model.temperature"
+        assert CONFIG_MAX_TOKENS == "api.model.max_tokens"
     
     def test_output_config_keys(self):
         """Test output configuration keys."""
-        assert CONFIG_OUTPUT_MODE == "output_mode"
+        assert CONFIG_OUTPUT_MODE == "output.mode"
         assert CONFIG_OUTPUT_VERSION == "output_version"
     
     def test_file_config_keys(self):
         """Test file-specific configuration keys."""
-        assert CONFIG_CHANGELOG_FILE == "changelog_file"
+        assert CONFIG_CHANGELOG_FILE == "changelog.file"
         assert CONFIG_RELEASE_NOTES_FILE == "release_notes_file" 
         assert CONFIG_ANNOUNCEMENT_FILE == "announcement_file"
     
@@ -145,7 +145,7 @@ class TestTemplateConstants:
     
     def test_template_names(self):
         """Test template name values."""
-        assert TEMPLATE_MESSAGE == "message_prompt.md"
+        assert TEMPLATE_MESSAGE == "commit_message_prompt.md"
         assert TEMPLATE_SUMMARY == "summary_prompt.md"
         assert TEMPLATE_CHANGELOG == "changelog_prompt.md"
         assert TEMPLATE_RELEASE_NOTES == "release_notes_prompt.md"

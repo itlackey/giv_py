@@ -69,7 +69,7 @@ class TestMessageCommandIntegration:
         mock_git.get_diff.return_value = "test diff"
         mock_git.build_history_metadata.return_value = {
             'commit_id': 'abc123', 'short_commit_id': 'abc123', 'date': '2025-01-28',
-            'message': 'test', 'message_body': 'test body', 'branch': 'main'
+            'message': 'test', 'message_body': 'test body', 'author': 'Test User', 'branch': 'main'
         }
         mock_git_cls.return_value = mock_git
         
@@ -102,7 +102,7 @@ class TestMessageCommandIntegration:
         mock_git.get_diff.return_value = "test diff"
         mock_git.build_history_metadata.return_value = {
             'commit_id': 'abc123', 'short_commit_id': 'abc123', 'date': '2025-01-28',
-            'message': 'test', 'message_body': 'test body', 'branch': 'main'
+            'message': 'test', 'message_body': 'test body', 'author': 'Test User', 'branch': 'main'
         }
         mock_git_cls.return_value = mock_git
         
@@ -148,7 +148,7 @@ class TestSummaryCommandIntegration:
         mock_git.get_diff.return_value = "test diff"
         mock_git.build_history_metadata.return_value = {
             'commit_id': 'abc123', 'short_commit_id': 'abc123', 'date': '2025-01-28',
-            'message': 'test', 'message_body': 'test body', 'branch': 'main'
+            'message': 'test', 'message_body': 'test body', 'author': 'Test User', 'branch': 'main'
         }
         mock_git_cls.return_value = mock_git
         
@@ -200,7 +200,7 @@ class TestDocumentCommandIntegration:
         mock_git.get_diff.return_value = "test diff"
         mock_git.build_history_metadata.return_value = {
             'commit_id': 'abc123', 'short_commit_id': 'abc123', 'date': '2025-01-28',
-            'message': 'test', 'message_body': 'test body', 'branch': 'main'
+            'message': 'test', 'message_body': 'test body', 'author': 'Test User', 'branch': 'main'
         }
         mock_git_cls.return_value = mock_git
         
@@ -306,7 +306,7 @@ class TestAnnouncementCommandIntegration:
         mock_get_version.return_value = "1.0.0"
         mock_config_manager.get.side_effect = lambda key: {
             "announcement_file": "CUSTOM_ANNOUNCEMENT.md",
-            "output_mode": "prepend"
+            "output.mode": "prepend"
         }.get(key)
         
         cmd = AnnouncementCommand(basic_args, mock_config_manager)

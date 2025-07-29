@@ -27,6 +27,8 @@ from .commands import (
     AnnouncementCommand,
     ConfigCommand,
     InitCommand,
+    HelpCommand,
+    VersionCommand,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,7 +148,8 @@ Examples:
     subparsers.add_parser("version", help="Print the version and exit")
 
     # help command
-    subparsers.add_parser("help", help="Show help for a given command")
+    help_parser = subparsers.add_parser("help", help="Show help for a given command")
+    help_parser.add_argument("command_name", nargs="?", help="Command to show help for")
 
     # available-releases command
     subparsers.add_parser("available-releases", help="List script versions")
@@ -222,12 +225,9 @@ def run_command(args: argparse.Namespace) -> int:
         elif args.command == "init":
             return InitCommand(args, cfg_mgr).run()
         elif args.command == "version":
-            print(f"giv {__version__}")
-            return 0
+            return VersionCommand(args, cfg_mgr).run()
         elif args.command == "help":
-            # Delegate help to specific command if provided
-            build_parser().print_help()
-            return 0
+            return HelpCommand(args, cfg_mgr).run()
         else:
             # Unknown command
             print(f"Error: Unknown subcommand '{args.command}'.", file=sys.stderr)

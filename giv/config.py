@@ -1,10 +1,9 @@
 """
 Configuration management for giv.
 
-This module provides comprehensive configuration management that matches the
-Bash implementation exactly, including:
-- Configuration hierarchy (project .giv/config > user ~/.giv/config)
-- Environment variable integration with GIV_* prefix
+This module provides comprehensive configuration management with proper hierarchy:
+- Configuration hierarchy (project .giv/config > user ~/.giv/config > environment)
+- Environment variable integration with GIV_* prefix  
 - Dot-notation key normalization (api.key → GIV_API_KEY)
 - Configuration validation and merging
 - Support for quoted values and special characters
@@ -197,7 +196,7 @@ class ConfigManager:
     def list(self) -> Dict[str, str]:
         """Return all key–value pairs from config file and environment.
         
-        Environment variables take precedence over config file values.
+        Environment variables override config file values in display only.
         """
         # Start with config file data
         config_data = self._parse_config_file()
@@ -220,13 +219,8 @@ class ConfigManager:
         return result
 
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        """Retrieve value with precedence: environment > config file > default."""
-        # First check environment variables
-        env_value = self._get_from_environment(key)
-        if env_value is not None:
-            return env_value
-        
-        # Then check config file
+        """Retrieve value with precedence: config file > environment > default."""
+        # First check config file
         config_data = self._parse_config_file()
         
         # Try exact key match first
@@ -237,6 +231,11 @@ class ConfigManager:
         normalized_key = self._normalize_key(key)
         if normalized_key and normalized_key in config_data:
             return config_data[normalized_key]
+        
+        # Then check environment variables
+        env_value = self._get_from_environment(key)
+        if env_value is not None:
+            return env_value
         
         return default
 
