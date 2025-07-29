@@ -36,6 +36,10 @@ class ConfigManager:
         
         # Ensure parent directory exists
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize cache for performance optimization
+        self._config_cache: Optional[Dict[str, str]] = None
+        self._cache_mtime: Optional[float] = None
 
     @property
     def config_path(self) -> Path:
@@ -105,6 +109,29 @@ class ConfigManager:
             return unquoted
         return value
 
+    def _get_cached_config(self) -> Dict[str, str]:
+        """Get configuration with caching for performance optimization."""
+        if not self.path.exists():
+            return {}
+        
+        try:
+            # Check if cache is valid by comparing modification time
+            current_mtime = self.path.stat().st_mtime
+            if (self._config_cache is not None and 
+                self._cache_mtime is not None and 
+                self._cache_mtime == current_mtime):
+                # Cache is valid, return cached data
+                return self._config_cache
+            
+            # Cache is invalid or doesn't exist, reload from file
+            self._config_cache = self._parse_config_file()
+            self._cache_mtime = current_mtime
+            return self._config_cache
+            
+        except (OSError, IOError):
+            # If we can't stat the file, return empty config
+            return {}
+    
     def _parse_config_file(self) -> Dict[str, str]:
         """Parse the configuration file into a dictionary."""
         data: Dict[str, str] = {}
@@ -220,8 +247,8 @@ class ConfigManager:
 
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
         """Retrieve value with precedence: config file > environment > default."""
-        # First check config file
-        config_data = self._parse_config_file()
+        # First check config file (now with caching for performance)
+        config_data = self._get_cached_config()
         
         # Try exact key match first
         if key in config_data:
@@ -264,6 +291,9 @@ class ConfigManager:
                 config_data[key] = value
         
         self._write_config_file(config_data)
+        # Invalidate cache after writing
+        self._config_cache = None
+        self._cache_mtime = None
 
     def unset(self, key: str) -> None:
         """Remove ``key`` from the configuration file if present."""
@@ -282,3 +312,6 @@ class ConfigManager:
         
         if removed:
             self._write_config_file(config_data)
+            # Invalidate cache after writing
+            self._config_cache = None
+            self._cache_mtime = None

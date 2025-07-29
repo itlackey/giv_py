@@ -36,6 +36,11 @@ class TemplateEngine:
         """
         self.template_dir = template_dir
         self._base_template_dir: Optional[Path] = None
+        
+        # Compile regex patterns for performance optimization
+        self._brace_pattern = re.compile(r'\{([^{}]+)\}')
+        self._bracket_pattern = re.compile(r'\[([^\[\]]+)\]')
+        self._double_brace_pattern = re.compile(r'\{\{([^{}]+)\}\}')
 
     @property
     def base_template_dir(self) -> Path:
@@ -168,6 +173,7 @@ class TemplateEngine:
     def render_template(self, template_content: str, context: Dict[str, Any]) -> str:
         """Render template by replacing tokens with context values.
         
+        Optimized single-pass implementation using regex substitution.
         Supports {TOKEN} and [TOKEN] formats for compatibility.
         Unknown tokens are left intact.
         
@@ -183,41 +189,52 @@ class TemplateEngine:
         str
             Rendered template with tokens replaced
         """
-        result = template_content
+        if not context:
+            return template_content
         
-        # Replace {TOKEN} format (single brace) - but not double braces
+        # Normalize context values to strings once
+        normalized_context = {}
         for key, value in context.items():
             if value is None:
-                value = "None"
+                normalized_context[key] = "None"
             elif not isinstance(value, str):
-                value = str(value)
-            
-            # Only replace single braces that are not part of double braces
-            token_pattern = f"{{{key}}}"
-            double_brace_pattern = f"{{{{{key}}}}}"
-            
-            # Use a more careful replacement that avoids double braces
-            # First, temporarily replace double brace patterns with placeholders
-            placeholder = f"__DOUBLE_BRACE_{key}_PLACEHOLDER__"
-            temp_result = result.replace(double_brace_pattern, placeholder)
-            
-            # Replace single brace patterns
-            temp_result = temp_result.replace(token_pattern, value)
-            
-            # Restore double brace patterns
-            result = temp_result.replace(placeholder, double_brace_pattern)
+                normalized_context[key] = str(value)
+            else:
+                normalized_context[key] = value
         
-        # Replace [TOKEN] format (legacy compatibility)
-        for key, value in context.items():
-            if value is None:
-                value = "None"
-            elif not isinstance(value, str):
-                value = str(value)
-            
-            token_pattern = f"[{key}]"
-            result = result.replace(token_pattern, value)
+        # Replace single braces but preserve double braces
+        result = self._replace_tokens_optimized(template_content, normalized_context)
+        
+        # Replace [TOKEN] format (legacy compatibility) using regex
+        def replace_bracket(match):
+            token = match.group(1)
+            return normalized_context.get(token, match.group(0))
+        
+        result = self._bracket_pattern.sub(replace_bracket, result)
         
         return result
+    
+    def _replace_tokens_optimized(self, content: str, context: Dict[str, str]) -> str:
+        """Optimized token replacement handling single and double braces correctly."""
+        # Use a single regex substitution with proper double-brace handling
+        def replacer(match):
+            full_match = match.group(0)
+            
+            # Check if this is part of a double brace pattern
+            # Look backwards and forwards to detect double braces
+            start = match.start()
+            end = match.end()
+            
+            # Check for preceding and following braces
+            if (start > 0 and content[start-1] == '{' and 
+                end < len(content) and content[end] == '}'):
+                # This is part of a double brace pattern, don't replace
+                return full_match
+            
+            token = match.group(1)
+            return context.get(token, full_match)
+        
+        return self._brace_pattern.sub(replacer, content)
 
     def render_template_file(self, template_name: str, context: Dict[str, Any]) -> str:
         """Load and render a template file.

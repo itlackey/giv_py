@@ -77,7 +77,13 @@ class BaseCommand(ABC):
         tuple[str, Optional[List[str]]]
             Revision string and optional pathspec list
         """
-        revision = getattr(self.args, 'revision', DEFAULT_REVISION) or DEFAULT_REVISION
+        # Check for revision_flag first (--current, --cached flags)
+        revision_flag = getattr(self.args, 'revision_flag', None)
+        if revision_flag:
+            revision = revision_flag
+        else:
+            revision = getattr(self.args, 'revision', DEFAULT_REVISION) or DEFAULT_REVISION
+        
         pathspec = getattr(self.args, 'pathspec', []) or []
         return revision, pathspec if pathspec else None
     

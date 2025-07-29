@@ -108,12 +108,20 @@ Examples:
     msg_parser = subparsers.add_parser("message", aliases=["msg"], help="Generate a commit message from the diff")
     msg_parser.add_argument("revision", nargs="?", default="--current", help="Revision range to analyze")
     msg_parser.add_argument("pathspec", nargs="*", help="Limit analysis to the specified paths")
+    # Add convenience flags for common revision types
+    msg_revision_group = msg_parser.add_mutually_exclusive_group()
+    msg_revision_group.add_argument("--current", action="store_const", const="--current", dest="revision_flag", help="Analyze working tree changes (default)")
+    msg_revision_group.add_argument("--cached", action="store_const", const="--cached", dest="revision_flag", help="Analyze staged changes only")
     _add_common_args(msg_parser)
 
     # summary command
     summary_parser = subparsers.add_parser("summary", help="Generate a summary of recent changes")
     summary_parser.add_argument("revision", nargs="?", default="--current", help="Revision range to summarize")
     summary_parser.add_argument("pathspec", nargs="*", help="Limit summary to the specified paths")
+    # Add convenience flags for common revision types
+    summary_revision_group = summary_parser.add_mutually_exclusive_group()
+    summary_revision_group.add_argument("--current", action="store_const", const="--current", dest="revision_flag", help="Analyze working tree changes (default)")
+    summary_revision_group.add_argument("--cached", action="store_const", const="--cached", dest="revision_flag", help="Analyze staged changes only")
     _add_common_args(summary_parser)
 
     # changelog command
