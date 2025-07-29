@@ -20,18 +20,14 @@ jobs:
             arch: x86_64
             runner: ubuntu-latest
             target: linux-x86_64
-          - platform: linux
-            arch: arm64
-            runner: ubuntu-latest
-            target: linux-arm64
-          - platform: darwin
+          - platform: macos
             arch: x86_64
             runner: macos-13
-            target: darwin-x86_64
-          - platform: darwin
+            target: macos-x86_64
+          - platform: macos
             arch: arm64
             runner: macos-latest
-            target: darwin-arm64
+            target: macos-arm64
           - platform: windows
             arch: x86_64
             runner: windows-latest
@@ -46,7 +42,13 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.8'
+        python-version: '3.11'
+    
+    - name: Install system dependencies (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpython3.11-dev
     
     - name: Install Poetry
       uses: snok/install-poetry@v1
@@ -56,48 +58,34 @@ jobs:
         virtualenvs-in-project: true
     
     - name: Install dependencies
-      run: poetry install --no-dev
-    
-    - name: Install UPX (Linux/macOS)
-      if: matrix.platform != 'windows'
-      run: |
-        if [[ "${{ matrix.runner }}" == "ubuntu-latest" ]]; then
-          sudo apt-get update && sudo apt-get install -y upx-ucl
-        elif [[ "${{ matrix.runner }}" == "macos-"* ]]; then
-          brew install upx
-        fi
-    
-    - name: Install UPX (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        choco install upx
+      run: poetry install
     
     - name: Build binary
-      run: |
-        poetry run python build/pyinstaller/binary_builder.py \
-          --platform ${{ matrix.platform }} \
-          --arch ${{ matrix.arch }} \
-          --optimize
+      run: poetry run build-binary
     
-    - name: Test binary
+    - name: Test binary (Linux/macOS)
+      if: matrix.platform != 'windows'
       run: |
-        poetry run python build/pyinstaller/binary_builder.py \
-          --platform ${{ matrix.platform }} \
-          --arch ${{ matrix.arch }} \
-          --test
+        chmod +x dist/giv-${{ matrix.target }}
+        ./dist/giv-${{ matrix.target }} --version
+    
+    - name: Test binary (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        ./dist/giv-${{ matrix.target }}.exe --version
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: giv-${{ matrix.target }}
-        path: dist/*/giv-${{ matrix.target }}*
+        path: dist/giv-${{ matrix.target }}*
         retention-days: 30
     
     - name: Create release (on tag)
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/*/giv-${{ matrix.target }}*
+        files: dist/giv-${{ matrix.target }}*
         draft: false
         prerelease: ${{ contains(github.ref, '-') }}
       env:

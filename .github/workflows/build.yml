@@ -57,10 +57,41 @@ jobs:
             fi
           fi
           
+      - name: Configure Poetry PATH and verify
+        shell: bash
+        run: |
+          # Add potential Poetry paths to PATH
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            export PATH="$APPDATA/Python/Scripts:$PATH"
+            export PATH="$APPDATA/pypoetry/venv/Scripts:$PATH"
+            echo "$APPDATA/Python/Scripts" >> $GITHUB_PATH
+            echo "$APPDATA/pypoetry/venv/Scripts" >> $GITHUB_PATH
+          fi
+          
+          # Try to find poetry
+          which poetry || echo "Poetry not found in PATH"
+          poetry --version || echo "Poetry version check failed"
+          
+          # If poetry still not found, try pip install as fallback
+          if ! command -v poetry &> /dev/null; then
+            echo "Installing Poetry via pip as fallback..."
+            python -m pip install --user poetry
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              export PATH="$HOME/.local/bin:$PATH"
+              echo "$HOME/.local/bin" >> $GITHUB_PATH
+            fi
+          fi
+          
           # Final verification
           poetry --version
           poetry config virtualenvs.create true
           poetry config virtualenvs.in-project true
+
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpython3.11-dev
 
       - name: Load cached venv
         id: cached-poetry-dependencies
@@ -78,17 +109,22 @@ jobs:
         shell: bash
         run: poetry run pytest -q
 
-      - name: Build executable using build system
+      - name: Test binary build
         shell: bash
-        run: poetry run python build/build.py binaries
-
-      - name: List build outputs
-        shell: bash
-        run: find dist/ -type f -name "*" 2>/dev/null || echo "No dist directory found"
+        run: |
+          poetry run build-binary
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ./dist/giv-windows-x86_64.exe --version
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            chmod +x dist/giv-macos-*
+            ./dist/giv-macos-* --version
+          else
+            chmod +x dist/giv-linux-x86_64
+            ./dist/giv-linux-x86_64 --version
+          fi
 
       - name: Archive artifact
-        if: hashFiles('dist/**/*') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: giv-${{ matrix.os }}
-          path: dist/
+          name: giv-${{ matrix.os }}-test
+          path: dist/giv-*

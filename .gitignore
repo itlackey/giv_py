@@ -24,3 +24,4 @@ CLAUDE.md
 .giv
 .giv/config
 .claude/commands/
+build/giv-linux-x86_64/
