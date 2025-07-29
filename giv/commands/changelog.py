@@ -16,6 +16,7 @@ from ..constants import (
     OUTPUT_MODE_AUTO, OUTPUT_MODE_UPDATE
 )
 from ..lib.metadata import ProjectMetadata
+from ..lib.utils import resolve_config_triple
 from .base import DocumentGeneratingCommand
 
 
@@ -72,10 +73,17 @@ class ChangelogCommand(DocumentGeneratingCommand):
         bool
             True if successful, False otherwise
         """
-        # Use changelog-specific defaults
-        output_file = output_file or getattr(self.args, 'output_file', None) or self.config.get(CONFIG_CHANGELOG_FILE) or DEFAULT_CHANGELOG_FILE
-        output_mode = getattr(self.args, 'output_mode', None) or self.config.get(CONFIG_OUTPUT_MODE) or OUTPUT_MODE_AUTO
-        output_version = getattr(self.args, 'output_version', None) or self.config.get(CONFIG_OUTPUT_VERSION) or ProjectMetadata.get_version()
+        # Use changelog-specific defaults with shared utility
+        resolved_file, resolved_mode, resolved_version = resolve_config_triple(
+            self.args, self.config,
+            file_config=('output_file', CONFIG_CHANGELOG_FILE, DEFAULT_CHANGELOG_FILE),
+            mode_config=('output_mode', CONFIG_OUTPUT_MODE, OUTPUT_MODE_AUTO),
+            version_config=('output_version', CONFIG_OUTPUT_VERSION)
+        )
+        
+        output_file = output_file or resolved_file
+        output_mode = resolved_mode
+        output_version = resolved_version
         
         # Map "auto" mode to "update" for changelog
         if output_mode == OUTPUT_MODE_AUTO:

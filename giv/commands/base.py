@@ -180,8 +180,13 @@ class BaseCommand(ABC):
             logger.warning(f"TODO scanning failed: {e}")
             return ""
     
-    def create_llm_client(self) -> LLMClient:
+    def create_llm_client(self, temperature_override: Optional[float] = None) -> LLMClient:
         """Create and configure an LLM client instance.
+        
+        Parameters
+        ----------
+        temperature_override : Optional[float]
+            Override default temperature if provided
         
         Returns
         -------
@@ -194,7 +199,10 @@ class BaseCommand(ABC):
         model = getattr(self.args, 'api_model', None) or getattr(self.args, 'model', None) or self.config.get("api_model")
         
         # Get temperature and context window settings
-        temperature = float(self.config.get(CONFIG_TEMPERATURE) or str(DEFAULT_TEMPERATURE))
+        if temperature_override is not None:
+            temperature = temperature_override
+        else:
+            temperature = float(self.config.get(CONFIG_TEMPERATURE) or str(DEFAULT_TEMPERATURE))
         max_tokens = int(self.config.get(CONFIG_MAX_TOKENS) or str(DEFAULT_MAX_TOKENS))
         
         return LLMClient(
@@ -288,22 +296,9 @@ class DocumentGeneratingCommand(BaseCommand):
     
     def create_llm_client(self) -> LLMClient:
         """Create LLM client with command-specific temperature."""
-        # Get API configuration
-        api_url = self.args.api_url or self.config.get("api_url")
-        api_key = self.args.api_key or self.config.get("api_key")
-        model = getattr(self.args, 'api_model', None) or getattr(self.args, 'model', None) or self.config.get("api_model")
-        
-        # Use command-specific temperature default
-        temperature = float(self.config.get(CONFIG_TEMPERATURE) or str(self.default_temperature))
-        max_tokens = int(self.config.get(CONFIG_MAX_TOKENS) or str(DEFAULT_MAX_TOKENS))
-        
-        return LLMClient(
-            api_url=api_url, 
-            api_key=api_key, 
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
+        # Use parent method with command-specific temperature override
+        default_temp = float(self.config.get(CONFIG_TEMPERATURE) or str(self.default_temperature))
+        return super().create_llm_client(temperature_override=default_temp)
     
     def run(self) -> int:
         """Standard document generation workflow."""

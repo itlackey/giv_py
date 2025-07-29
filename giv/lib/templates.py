@@ -83,9 +83,33 @@ class TemplateEngine:
         FileNotFoundError
             If template cannot be found in any location
         """
-        # 1. Check if it's an explicit path
+        # 1. Security: Validate template name to prevent path traversal attacks
+        if not self._is_safe_template_name(template_name):
+            raise TemplateError(f"Invalid template name: {template_name}")
+        
+        # Handle explicit paths securely
         if template_name.startswith("/") or template_name.startswith("./") or template_name.startswith("../"):
-            template_path = Path(template_name)
+            template_path = Path(template_name).resolve()
+            
+            # Security: Only allow absolute paths within safe directories
+            safe_directories = [
+                Path.home() / ".giv" / "templates",
+                Path.cwd() / ".giv" / "templates"
+            ]
+            
+            # Add current template directory if set
+            if self.template_dir:
+                safe_directories.append(self.template_dir.resolve())
+            
+            # Check if resolved path is within allowed directories
+            is_safe = any(
+                self._is_path_within_directory(template_path, safe_dir) 
+                for safe_dir in safe_directories
+            )
+            
+            if not is_safe:
+                raise TemplateError(f"Template path not allowed: {template_path}")
+            
             if template_path.exists():
                 return template_path
             raise TemplateError(f"Template not found: {template_path}")
@@ -289,6 +313,67 @@ class TemplateEngine:
                 templates[template_file.name] = template_file
 
         return templates
+
+    def _is_safe_template_name(self, template_name: str) -> bool:
+        """Validate template name for security.
+        
+        Parameters
+        ----------
+        template_name : str
+            Template name to validate
+            
+        Returns
+        -------
+        bool
+            True if template name is safe
+        """
+        import re
+        
+        # Reject names with null bytes, control characters, or directory traversal patterns
+        if '\x00' in template_name or any(ord(c) < 32 for c in template_name):
+            return False
+        
+        # Reject obvious directory traversal attempts
+        dangerous_patterns = ['../', '..\\', '.\\', '~/', '/etc/', '/var/', '/usr/', '/proc/']
+        template_lower = template_name.lower()
+        if any(pattern in template_lower for pattern in dangerous_patterns):
+            return False
+        
+        # Reject names that are too long (potential buffer overflow)
+        if len(template_name) > 255:
+            return False
+        
+        # Allow only reasonable template filename characters
+        if not re.match(r'^[a-zA-Z0-9._/\-]+$', template_name):
+            return False
+        
+        return True
+    
+    def _is_path_within_directory(self, path: Path, directory: Path) -> bool:
+        """Check if a path is within a given directory.
+        
+        Parameters
+        ----------
+        path : Path
+            Path to check (should be resolved)
+        directory : Path
+            Parent directory to check against
+            
+        Returns
+        -------
+        bool
+            True if path is within directory
+        """
+        try:
+            # Resolve both paths to handle symlinks and relative components
+            resolved_path = path.resolve()
+            resolved_directory = directory.resolve()
+            
+            # Check if path starts with directory
+            return str(resolved_path).startswith(str(resolved_directory) + '/')
+        except (OSError, ValueError):
+            # If resolution fails, err on the side of caution
+            return False
 
 
 # Backward compatibility aliases

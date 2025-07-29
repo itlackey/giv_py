@@ -16,6 +16,7 @@ from ..constants import (
     OUTPUT_MODE_AUTO, OUTPUT_MODE_OVERWRITE
 )
 from ..lib.metadata import ProjectMetadata
+from ..lib.utils import resolve_config_triple, generate_version_based_filename
 from .base import DocumentGeneratingCommand
 
 
@@ -72,14 +73,23 @@ class AnnouncementCommand(DocumentGeneratingCommand):
         bool
             True if successful, False otherwise
         """
-        # Use announcement-specific defaults with version-based naming  
-        if not output_file and not getattr(self.args, 'output_file', None) and not self.config.get(CONFIG_ANNOUNCEMENT_FILE):
-            version = output_version or ProjectMetadata.get_version() or "unknown"
-            output_file = f"{version}_announcement.md"
+        # Use shared configuration resolution utility
+        resolved_file, resolved_mode, resolved_version = resolve_config_triple(
+            self.args, self.config,
+            file_config=('output_file', CONFIG_ANNOUNCEMENT_FILE, DEFAULT_ANNOUNCEMENT_FILE),
+            mode_config=('output_mode', CONFIG_OUTPUT_MODE, OUTPUT_MODE_AUTO),
+            version_config=('output_version', CONFIG_OUTPUT_VERSION)
+        )
+        
+        # Use version-based naming only if no explicit file was specified anywhere
+        if (not output_file and 
+            not getattr(self.args, 'output_file', None) and 
+            not self.config.get(CONFIG_ANNOUNCEMENT_FILE)):
+            output_file = generate_version_based_filename("announcement", resolved_version)
         else:
-            output_file = output_file or getattr(self.args, 'output_file', None) or self.config.get(CONFIG_ANNOUNCEMENT_FILE) or DEFAULT_ANNOUNCEMENT_FILE
-        output_mode = getattr(self.args, 'output_mode', None) or self.config.get(CONFIG_OUTPUT_MODE) or OUTPUT_MODE_AUTO
-        output_version = getattr(self.args, 'output_version', None) or self.config.get(CONFIG_OUTPUT_VERSION) or ProjectMetadata.get_version()
+            output_file = output_file or resolved_file
+        output_mode = resolved_mode
+        output_version = resolved_version
         
         # Map "auto" mode to "overwrite" for announcements
         if output_mode == OUTPUT_MODE_AUTO:

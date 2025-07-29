@@ -268,11 +268,18 @@ def _run_available_releases(args: argparse.Namespace, cfg_mgr: ConfigManager) ->
     """Handle the ``available-releases`` subcommand."""
     import urllib.request
     import json
+    import ssl
     
     try:
-        # Fetch releases from GitHub API
-        url = "https://api.github.com/repos/giv-cli/giv/releases"
-        with urllib.request.urlopen(url) as response:
+        # Create secure SSL context for HTTPS requests
+        ssl_context = ssl.create_default_context()
+        
+        # Fetch releases from GitHub API with certificate validation
+        url = "https://api.github.com/repos/giv-cli/giv-py/releases"
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'giv-cli-updater/1.0')
+        
+        with urllib.request.urlopen(req, context=ssl_context, timeout=30) as response:
             releases_data = json.loads(response.read().decode('utf-8'))
         
         # Extract and print tag names
@@ -290,16 +297,21 @@ def _run_update(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
     """Handle the ``update`` subcommand."""
     import urllib.request
     import json
-    import subprocess
-    import shlex
+    import ssl
     
     # Get target version from args or default to latest
     target_version = getattr(args, 'version', None) or 'latest'
     
     try:
-        # Fetch available releases from GitHub API
-        url = "https://api.github.com/repos/giv-cli/giv/releases"
-        with urllib.request.urlopen(url) as response:
+        # Create secure SSL context for HTTPS requests
+        ssl_context = ssl.create_default_context()
+        
+        # Fetch available releases from GitHub API with certificate validation
+        url = "https://api.github.com/repos/giv-cli/giv-py/releases"
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'giv-cli-updater/1.0')
+        
+        with urllib.request.urlopen(req, context=ssl_context, timeout=30) as response:
             releases_data = json.loads(response.read().decode('utf-8'))
         
         if not releases_data:
@@ -310,7 +322,6 @@ def _run_update(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
         if target_version == 'latest':
             latest_version = releases_data[0]['tag_name']
             actual_version = latest_version
-            print(f"Updating giv to version {actual_version}...")
         else:
             # Verify the specified version exists
             available_versions = [release['tag_name'] for release in releases_data]
@@ -319,28 +330,43 @@ def _run_update(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
                 print(f"Available versions: {', '.join(available_versions)}", file=sys.stderr)
                 return 1
             actual_version = target_version
-            print(f"Updating giv to version {actual_version}...")
         
-        # Run the install script with the target version
-        install_url = "https://raw.githubusercontent.com/giv-cli/giv/main/install.sh"
-        curl_cmd = ["curl", "-fsSL", install_url]
-        sh_cmd = ["sh", "--", "--version", actual_version]
+        # Get current version for comparison
+        try:
+            from giv import __version__
+            current_version = __version__
+        except ImportError:
+            current_version = "unknown"
         
-        # Use subprocess to pipe curl output to sh
-        with subprocess.Popen(curl_cmd, stdout=subprocess.PIPE) as curl_proc:
-            result = subprocess.run(sh_cmd, stdin=curl_proc.stdout, 
-                                  capture_output=False, text=True)
-            curl_proc.stdout.close()
-            
-            if result.returncode != 0:
-                print(f"Error: Installation failed with exit code {result.returncode}", file=sys.stderr)
-                return 1
+        # Check if update is needed
+        if current_version != "unknown" and current_version == actual_version.lstrip('v'):
+            print(f"Already at version {current_version}")
+            return 0
         
-        print("Update complete.")
+        # SECURITY: Disable automatic script execution to prevent command injection
+        # Instead, provide safe manual update instructions
+        print(f"Update available: {current_version} -> {actual_version}")
+        print("\nFor security reasons, automatic updates have been disabled.")
+        print("To update safely, please use one of these methods:")
+        print()
+        print("1. Download binary directly:")
+        print(f"   https://github.com/giv-cli/giv-py/releases/tag/{actual_version}")
+        print()
+        print("2. Use package manager (recommended):")
+        print("   brew upgrade giv              # Homebrew (macOS/Linux)")
+        print("   scoop update giv              # Scoop (Windows)")
+        print("   pip install --upgrade giv     # PyPI")
+        print()
+        print("3. Use installation script (verify before running):")
+        print("   curl -fsSL https://raw.githubusercontent.com/giv-cli/giv-py/main/install.sh | sh")
+        print()
+        print("Note: The script method requires manual verification for security.")
+        
         return 0
         
     except Exception as e:
-        print(f"Error during update: {e}", file=sys.stderr)
+        print(f"Error during update check: {e}", file=sys.stderr)
+        print("Please check your internet connection and try again.")
         return 1
 
 

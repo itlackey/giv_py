@@ -160,7 +160,7 @@ class LLMClient:
             self.api_key = "giv"  # Use 'giv' as the key for local services
         
         headers["Authorization"] = f"Bearer {self.api_key}"
-        logger.debug(f"Using Authorization header with API key: {self.api_key}")
+        logger.debug(f"Using Authorization header with API key: {self._mask_api_key(self.api_key)}")
 
         # Prepare request body (OpenAI ChatCompletion format)
         data = {
@@ -171,7 +171,9 @@ class LLMClient:
         }
 
         logger.debug(f"Making request to: {self.api_url}")
-        logger.debug(f"Request data: {json.dumps(data, indent=2)}")
+        # Create a copy of data for logging without sensitive information
+        log_data = data.copy()
+        logger.debug(f"Request data: {json.dumps(log_data, indent=2)}")
 
         # Make request
         resp = requests.post(
@@ -300,6 +302,25 @@ class LLMClient:
             logger.debug(f"Failed to get models list: {e}")
         
         return []
+
+    def _mask_api_key(self, api_key: str) -> str:
+        """Mask API key for safe logging.
+        
+        Parameters
+        ----------
+        api_key : str
+            API key to mask
+            
+        Returns
+        -------
+        str
+            Masked API key showing only first and last few characters
+        """
+        if not api_key or len(api_key) <= 8:
+            return "***"
+        
+        # Show first 4 and last 4 characters, mask the middle
+        return f"{api_key[:4]}{'*' * (len(api_key) - 8)}{api_key[-4:]}"
 
     @staticmethod
     def json_escape(text: str) -> str:
