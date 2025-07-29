@@ -52,12 +52,12 @@ class ProjectMetadata:
             path = Path.cwd()
         
         # Check files in priority order matching Bash implementation
-        if (path / "package.json").exists():
-            return "node"
-        elif (path / "pyproject.toml").exists():
+        if (path / "pyproject.toml").exists():
             return "python"
         elif (path / "setup.py").exists():
             return "python"
+        elif (path / "package.json").exists():
+            return "node"
         elif (path / "Cargo.toml").exists():
             return "rust"
         elif (path / "go.mod").exists():
@@ -121,18 +121,68 @@ class ProjectMetadata:
                 project_type = cls.detect_project_type()
         
         # Handle different project types matching Bash logic
+        result = ""
         if project_type == "node":
-            return cls._get_node_metadata(key, commit)
+            result = cls._get_node_metadata(key, commit)
         elif project_type == "python":
-            return cls._get_python_metadata(key, commit)
+            result = cls._get_python_metadata(key, commit)
         elif project_type == "rust":
-            return cls._get_rust_metadata(key, commit)
+            result = cls._get_rust_metadata(key, commit)
         elif project_type == "go":
-            return cls._get_go_metadata(key, commit)
+            result = cls._get_go_metadata(key, commit)
         elif project_type == "custom":
-            return cls._get_custom_metadata(key, commit)
-        else:
+            result = cls._get_custom_metadata(key, commit)
+        
+        # If version not found in project files, try git tags
+        if not result and key == "version":
+            result = cls._get_version_from_git_tag(commit)
+        
+        return result
+
+    @classmethod
+    def _get_version_from_git_tag(cls, commit: str = "HEAD") -> str:
+        """Extract version from git tags."""
+        try:
+            # Get the most recent tag
+            result = subprocess.run(
+                ["git", "describe", "--tags", "--abbrev=0", commit],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if result.returncode == 0:
+                tag = result.stdout.strip()
+                if tag:
+                    # Extract version from tag (remove common prefixes)
+                    return cls._extract_version_from_tag(tag)
+        except (FileNotFoundError, subprocess.SubprocessError):
+            pass
+        
+        return ""
+    
+    @classmethod
+    def _extract_version_from_tag(cls, tag: str) -> str:
+        """Extract version number from git tag."""
+        if not tag:
             return ""
+        
+        # Remove common prefixes like 'v', 'release-', etc.
+        patterns = [
+            r'^v(.+)$',                    # v1.2.3 -> 1.2.3
+            r'^release-(.+)$',             # release-1.2.3 -> 1.2.3
+            r'^version-(.+)$',             # version-1.2.3 -> 1.2.3
+            r'^(.+)$',                     # 1.2.3 -> 1.2.3 (no prefix)
+        ]
+        
+        for pattern in patterns:
+            match = re.match(pattern, tag, re.IGNORECASE)
+            if match:
+                version = match.group(1)
+                # Check if it looks like a version number
+                if re.match(r'^\d+(\.\d+)*', version):
+                    return version
+        
+        return tag  # Return original tag if no version pattern found
 
     @classmethod
     def _get_node_metadata(cls, key: str, commit: str) -> str:
@@ -146,42 +196,49 @@ class ProjectMetadata:
             value = data.get(key, "")
             return str(value) if value is not None else ""
         except (json.JSONDecodeError, KeyError):
-            # Fallback to awk-style parsing for malformed JSON
-            return cls._parse_json_like(content, key)
+            # For malformed JSON, return empty string to allow fallback to directory name
+            return ""
 
     @classmethod
     def _get_python_metadata(cls, key: str, commit: str) -> str:
-        """Extract metadata from pyproject.toml."""
+        """Extract metadata from pyproject.toml or setup.py."""
+        # Try pyproject.toml first
         content = cls.get_file_content_at_commit("pyproject.toml", commit)
-        if not content:
-            return ""
+        if content:
+            try:
+                import tomllib
+                data = tomllib.loads(content)
+                
+                # Try PEP 621 project metadata first
+                project = data.get("project", {})
+                if key in project:
+                    value = project[key]
+                    return str(value) if value is not None else ""
+                
+                # Try Poetry metadata
+                poetry = data.get("tool", {}).get("poetry", {})
+                if key in poetry:
+                    value = poetry[key]
+                    return str(value) if value is not None else ""
+                    
+                # Handle special key mappings
+                if key == "title" and "name" in project:
+                    return str(project["name"])
+                elif key == "title" and "name" in poetry:
+                    return str(poetry["name"])
+                    
+            except Exception:
+                # Fallback to regex parsing for malformed TOML
+                result = cls._parse_toml_like(content, key)
+                if result:
+                    return result
         
-        try:
-            import tomllib
-            data = tomllib.loads(content)
-            
-            # Try PEP 621 project metadata first
-            project = data.get("project", {})
-            if key in project:
-                value = project[key]
-                return str(value) if value is not None else ""
-            
-            # Try Poetry metadata
-            poetry = data.get("tool", {}).get("poetry", {})
-            if key in poetry:
-                value = poetry[key]
-                return str(value) if value is not None else ""
-                
-            # Handle special key mappings
-            if key == "title" and "name" in project:
-                return str(project["name"])
-            elif key == "title" and "name" in poetry:
-                return str(poetry["name"])
-                
-            return ""
-        except Exception:
-            # Fallback to regex parsing for malformed TOML
-            return cls._parse_toml_like(content, key)
+        # Try setup.py if pyproject.toml didn't work
+        setup_content = cls.get_file_content_at_commit("setup.py", commit)
+        if setup_content:
+            return cls._parse_setup_py(setup_content, key)
+        
+        return ""
 
     @classmethod
     def _get_rust_metadata(cls, key: str, commit: str) -> str:
@@ -278,6 +335,27 @@ class ProjectMetadata:
         return ""
 
     @classmethod
+    def _parse_setup_py(cls, content: str, key: str) -> str:
+        """Parse setup.py content for metadata."""
+        # Look for setup() call with key=value patterns
+        # Handle both quoted and unquoted values
+        patterns = [
+            rf'{re.escape(key)}\s*=\s*["\']([^"\']+)["\']',  # key="value" or key='value'
+            rf'{re.escape(key)}\s*=\s*([^,\)\s]+)',          # key=value (unquoted)
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                value = match.group(1).strip()
+                # Handle special key mappings
+                if key == "title" and not value:
+                    continue
+                return value
+        
+        return ""
+
+    @classmethod
     def _parse_json_like(cls, content: str, key: str) -> str:
         """Parse JSON-like content with regex fallback."""
         pattern = rf'"{re.escape(key)}"\s*:\s*"([^"]+)"'
@@ -327,7 +405,25 @@ class ProjectMetadata:
     def get_version(commit: str = "HEAD") -> str:
         """Return the project version if it can be determined."""
         version = ProjectMetadata.get_metadata_value("version", commit)
+        if version:
+            # Normalize version string
+            version = ProjectMetadata._normalize_version(version)
         return version if version else "0.0.0"
+    
+    @staticmethod
+    def _normalize_version(version: str) -> str:
+        """Normalize version string by removing 'v' prefix and trimming whitespace."""
+        if not version:
+            return version
+        
+        # Strip whitespace
+        version = version.strip()
+        
+        # Remove 'v' prefix (case-insensitive)
+        if version.lower().startswith('v'):
+            version = version[1:]
+        
+        return version
 
     @staticmethod
     def get_description(commit: str = "HEAD") -> str:

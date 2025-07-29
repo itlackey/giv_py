@@ -97,6 +97,10 @@ def main(argv: list[str] | None = None) -> int:
     # Preprocess arguments for compatibility
     argv = _preprocess_args(argv)
     
+    # Handle case where preprocessing returns None (edge case for testing)
+    if argv is None:
+        argv = []
+    
     parser = build_parser()
     try:
         args = parser.parse_args(argv)
@@ -106,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if e.code != 0 else 0
 
     # Configure logging based on verbosity
-    if getattr(args, "verbose", False):
+    if getattr(args, "verbose", 0) > 0:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)

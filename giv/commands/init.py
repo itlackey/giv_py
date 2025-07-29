@@ -62,7 +62,7 @@ class InitCommand(BaseCommand):
                     if not dest.exists():
                         dest.write_text(template_file.read_text(encoding='utf-8'), encoding='utf-8')
                         copied_count += 1
-                        if self.args.verbose:
+                        if self.args.verbose > 0:
                             print(f"Copied template: {template_file.name}")
                 
                 if copied_count > 0:

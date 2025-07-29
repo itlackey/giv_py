@@ -39,7 +39,7 @@ class VersionCommand(BaseCommand):
         int
             Exit code (0 for success, non-zero for failure)
         """
-        verbose = getattr(self.args, 'verbose', False)
+        verbose = getattr(self.args, 'verbose', 0) > 0
         
         if verbose:
             return self._show_detailed_version()

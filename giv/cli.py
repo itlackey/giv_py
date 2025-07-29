@@ -74,7 +74,7 @@ Examples:
     # Global options - matching Bash version exactly
     parser.add_argument("-h", "--help", action="store_true", help="Show this help message and exit")
     parser.add_argument("-v", "--version", action="store_true", help="Show the program's version number and exit")
-    parser.add_argument("--verbose", action="store_true", help="Enable debug/trace output")
+    parser.add_argument("--verbose", action="count", default=0, help="Enable debug/trace output")  
     parser.add_argument("--dry-run", action="store_true", help="Preview only; don't write any files")
     parser.add_argument("--config-file", type=str, help="Shell config file to source before running")
     parser.add_argument("--todo-files", type=str, help="Pathspec for files to scan for TODOs")
@@ -178,7 +178,7 @@ def run_command(args: argparse.Namespace) -> int:
     
     try:
         # Set up logging if verbose mode enabled
-        if args.verbose:
+        if args.verbose > 0:
             logging.basicConfig(level=logging.DEBUG)
         
         # Preprocess global flags
