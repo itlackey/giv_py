@@ -222,27 +222,58 @@ class ProjectMetadata:
     @classmethod
     def _get_custom_metadata(cls, key: str, commit: str) -> str:
         """Extract metadata from custom version file."""
-        version_file = os.environ.get("GIV_PROJECT_VERSION_FILE", "version.txt")
-        content = cls.get_file_content_at_commit(version_file, commit)
-        if not content:
-            return ""
+        # Try multiple common version file names
+        version_files = [
+            os.environ.get("GIV_PROJECT_VERSION_FILE", "version.txt"),
+            "VERSION.txt",
+            "VERSION",
+            "version",
+            "__version__.py"
+        ]
         
-        # Parse custom format matching Bash awk logic
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_files = []
+        for f in version_files:
+            if f not in seen:
+                seen.add(f)
+                unique_files.append(f)
+        
+        for version_file in unique_files:
+            content = cls.get_file_content_at_commit(version_file, commit)
+            if not content:
+                continue
+                
+            # Handle Python __version__.py files
+            if version_file.endswith(".py"):
+                if key == "version":
+                    match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
+                    if match:
+                        return match.group(1)
                 continue
             
-            # Case-insensitive matching
-            if re.search(rf'\b{re.escape(key)}\b', line, re.IGNORECASE):
-                # Look for key=value pattern
-                if "=" in line:
-                    parts = line.split("=", 1)
-                    if len(parts) == 2:
-                        value = parts[1].strip()
-                        # Remove quotes
-                        value = re.sub(r'^["\']|["\']$', '', value)
-                        return value
+            # Handle plain version files - if key is "version", just return first line
+            if key == "version":
+                first_line = content.strip().split('\n')[0].strip()
+                if first_line:
+                    return first_line
+                    
+            # Parse custom format matching Bash awk logic for other keys
+            for line in content.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                
+                # Case-insensitive matching
+                if re.search(rf'\b{re.escape(key)}\b', line, re.IGNORECASE):
+                    # Look for key=value pattern
+                    if "=" in line:
+                        parts = line.split("=", 1)
+                        if len(parts) == 2:
+                            value = parts[1].strip()
+                            # Remove quotes
+                            value = re.sub(r'^["\']|["\']$', '', value)
+                            return value
         
         return ""
 

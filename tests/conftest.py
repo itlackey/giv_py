@@ -10,12 +10,24 @@ the Python implementation of giv CLI. It includes utilities for:
 """
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Dict
 import subprocess
 import pytest
 
 from giv.config import ConfigManager
+
+
+@contextmanager
+def change_directory(path: Path):
+    """Context manager to temporarily change working directory for git repository testing."""
+    prev_cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
 
 
 @pytest.fixture

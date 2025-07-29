@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Repository validation and root navigation
     # Skip for certain commands that don't require repository context
-    skip_repo_validation = getattr(args, 'command', None) in ['version', 'help', 'available-releases', 'update']
+    skip_repo_validation = getattr(args, 'command', None) in ['version', 'help', 'available-releases', 'update', 'init']
     
     if not skip_repo_validation:
         from .lib.repository import validate_and_change_to_repo_root
