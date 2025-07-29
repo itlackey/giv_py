@@ -79,15 +79,19 @@ class VersionCommand(BaseCommand):
         
         # Show Git repository status
         try:
-            if self.history.is_repository():
-                repo_root = self.history.get_repository_root()
-                current_branch = self.history.get_current_branch()
+            from ..lib.repository import get_repository_info, is_git_repository
+            if is_git_repository():
+                repo_info = get_repository_info()
+                repo_root = repo_info.get("root", "Unknown")
+                current_branch = repo_info.get("branch", "Unknown")
                 print(f"  Git repository: {repo_root}")
                 print(f"  Current branch: {current_branch}")
+                if "remote" in repo_info:
+                    print(f"  Remote origin: {repo_info['remote']}")
             else:
                 print("  Git repository: Not in a Git repository")
-        except Exception:
-            print("  Git repository: Unable to determine")
+        except Exception as e:
+            print(f"  Git repository: Unable to determine ({e})")
         
         # Show cache information
         cache_dir = Path.cwd() / ".giv" / "cache"

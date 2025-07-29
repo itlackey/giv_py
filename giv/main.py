@@ -111,6 +111,14 @@ def main(argv: list[str] | None = None) -> int:
     else:
         logging.basicConfig(level=logging.INFO)
 
+    # Repository validation and root navigation
+    # Skip for certain commands that don't require repository context
+    skip_repo_validation = getattr(args, 'command', None) in ['version', 'help', 'available-releases', 'update']
+    
+    if not skip_repo_validation:
+        from .lib.repository import validate_and_change_to_repo_root
+        validate_and_change_to_repo_root()
+
     try:
         return run_command(args)
     except KeyboardInterrupt:

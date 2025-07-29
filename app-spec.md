@@ -20,6 +20,20 @@ Sections 2,3,5,7,9,12 need corrections
 - Teams requiring consistent documentation standards
 - Organizations needing automated content generation for releases
 
+### 1.3 Repository Requirements
+**Giv requires execution from within a Git repository and automatically operates from the repository root directory:**
+
+- **Git Repository Required**: The application must be executed from within a Git repository or one of its subdirectories
+- **Automatic Root Discovery**: On startup, the application automatically detects the Git repository root using `git rev-parse --show-toplevel`
+- **Working Directory Change**: The application changes to the repository root directory for all operations
+- **Exit on Invalid Repository**: If not executed from within a Git repository, the application exits with an error message
+
+This design ensures:
+- Consistent behavior regardless of execution location within the repository
+- Proper relative path resolution for configuration files (`.giv/config`, `.giv/templates/`)
+- Accurate project metadata detection from root-level files (`package.json`, `pyproject.toml`, etc.)
+- Reliable Git operations across the entire repository
+
 ## 2. Command Structure and Interface
 
 ### 2.1 Basic Command Pattern
@@ -272,7 +286,13 @@ Templates support variable substitution with `{VARIABLE}` syntax:
 
 ## 6. Git Integration
 
-### 6.1 Revision Support
+### 6.1 Repository Requirements and Initialization
+- **Repository Detection**: Application uses `git rev-parse --show-toplevel` to find repository root
+- **Automatic Root Navigation**: Changes working directory to repository root on startup
+- **Repository Validation**: Exits with error if not executed from within a Git repository
+- **Consistent Operation**: All file paths and operations are relative to repository root
+
+### 6.2 Revision Support
 - **Full Git syntax**: Supports all gitrevisions formats
 - **Revision ranges**: `v1.0.0..HEAD`, `HEAD~3..HEAD`, `branch1..branch2`
 - **Special revisions**:
@@ -280,14 +300,14 @@ Templates support variable substitution with `{VARIABLE}` syntax:
   - `--cached`: Staged changes only
 - **Path specifications**: Limit analysis to specific files/directories
 
-### 6.2 Repository Analysis
+### 6.3 Repository Analysis
 - **Diff extraction**: Generates unified diffs for AI analysis
 - **Metadata collection**: Commit hashes, dates, messages, authors
 - **Branch detection**: Current branch identification
 - **Status checking**: Working tree and index status
 - **Untracked files**: Includes new files in analysis
 
-### 6.3 Project Metadata Detection
+### 6.4 Project Metadata Detection
 Automatically detects project information from:
 
 | Project Type | Files | Metadata Extracted |
@@ -386,7 +406,8 @@ giv config set api.model "llama3.2"
 
 ### 10.1 Comprehensive Error Management
 - **Configuration validation**: Detects invalid or missing settings
-- **Git repository validation**: Ensures valid Git repository context  
+- **Git repository validation**: Ensures valid Git repository context and exits if not in repository
+- **Repository root detection**: Automatically finds and changes to repository root directory
 - **API error handling**: 3 retry attempts for LLM requests, then exit on failure
 - **Template validation**: Verifies template file existence and readability
 - **File permission checking**: Validates write permissions before modification
@@ -414,9 +435,11 @@ giv config set api.model "llama3.2"
 
 ### 11.2 File System Layout
 - **User configuration**: `~/.giv/config`
-- **Project configuration**: `.giv/config` 
-- **Project templates**: `.giv/templates/`
+- **Project configuration**: `.giv/config` (relative to repository root)
+- **Project templates**: `.giv/templates/` (relative to repository root)
 - **System templates**: Bundled in binary or Python package
+
+**Note**: All project-relative paths are resolved from the Git repository root directory, ensuring consistent behavior regardless of where the application is executed within the repository.
 
 ### 11.3 Self-Update System
 - **Update command**: `giv update [version]` for in-place updates
@@ -426,6 +449,13 @@ giv config set api.model "llama3.2"
 ## 12. Business Rules and Requirements
 
 ### 12.0 Workflow
+**Application Initialization**:
+1. Validate execution environment (check for Git repository)
+2. Detect Git repository root using `git rev-parse --show-toplevel`
+3. Change working directory to repository root
+4. Load configuration from repository and user settings
+
+**Content Generation**:
 1. Parse the list of commits from the provided revision
 2. Loop through each commit in the list
    1. Create history file contain diff and metadata for a commit
@@ -443,11 +473,13 @@ giv config set api.model "llama3.2"
 5. **All content** must be factually accurate based on actual code changes
 
 ### 12.2 Git Integration Requirements
-1. **Must operate in valid Git repositories** or provide clear error messages
-2. **Must support all standard Git revision syntax** without exceptions
-3. **Must handle empty repositories and initial commits** gracefully
-4. **Must respect Git ignore patterns** for file analysis
-5. **Must preserve Git repository state** without unintended modifications
+1. **Must operate in valid Git repositories** and exit with clear error messages if not in a repository
+2. **Must automatically change to repository root directory** on startup using `git rev-parse --show-toplevel`
+3. **Must support all standard Git revision syntax** without exceptions
+4. **Must handle empty repositories and initial commits** gracefully
+5. **Must respect Git ignore patterns** for file analysis
+6. **Must preserve Git repository state** without unintended modifications
+7. **Must ensure consistent behavior** regardless of execution location within repository
 
 ### 12.3 Configuration Requirements
 1. **Must support hierarchical configuration** with clear precedence rules
