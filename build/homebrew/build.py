@@ -3,13 +3,23 @@ Homebrew formula builder for giv CLI.
 
 Generates Homebrew formulas that reference binary releases.
 """
-import hashlib
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-from ..core.config import BuildConfig
-from ..core.version_manager import VersionManager
+# Handle imports for both standalone and package usage
+try:
+    from ..core.config import BuildConfig
+    from ..core.version_manager import VersionManager
+    from ..core.utils import ensure_dir, calculate_sha256, replace_template_vars
+except ImportError:
+    # Fallback for standalone usage
+    import sys
+    sys.path.append(str(Path(__file__).parent.parent))
+    from core.config import BuildConfig
+    from core.version_manager import VersionManager
+    from core.utils import ensure_dir, calculate_sha256, replace_template_vars
 
 
 class HomebrewBuilder:
@@ -23,97 +33,67 @@ class HomebrewBuilder:
         # Template file
         self.template_file = Path(__file__).parent / "giv.rb"
     
-    def calculate_sha256(self, file_path: Path) -> str:
-        """Calculate SHA256 hash of a file."""
-        sha256_hash = hashlib.sha256()
-        with open(file_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(chunk)
-        return sha256_hash.hexdigest()
-    
-    def generate_formula(self, version: str, binary_paths: Dict[str, Path]) -> str:
-        """
-        Generate Homebrew formula with binary checksums.
-        
-        Args:
-            version: Version string
-            binary_paths: Dictionary mapping platform-arch to binary path
-            
-        Returns:
-            Generated formula content
-        """
-        # Read template
-        with open(self.template_file, 'r') as f:
-            template = f.read()
-        
-        # Calculate checksums for each binary
-        checksums = {}
-        for platform_arch, binary_path in binary_paths.items():
-            if binary_path.exists():
-                checksum = self.calculate_sha256(binary_path)
-                checksums[platform_arch.upper().replace("-", "_") + "_SHA256"] = checksum
-        
-        # Replace template variables
-        replacements = {
-            "{{VERSION}}": version,
-            **{f"{{{{{key}}}}}": value for key, value in checksums.items()}
-        }
-        
-        formula = template
-        for placeholder, value in replacements.items():
-            formula = formula.replace(placeholder, value)
-        
-        return formula
-    
-    def build_formula(self, version: Optional[str] = None, binary_paths: Optional[Dict[str, Path]] = None) -> Path:
+    def build_formula(self, version: Optional[str] = None, output_dir: Optional[Path] = None) -> Path:
         """
         Build Homebrew formula.
         
         Args:
             version: Version string (auto-detected if not provided)
-            binary_paths: Binary paths (auto-detected if not provided)
+            output_dir: Output directory (defaults to dist/)
             
         Returns:
             Path to generated formula
         """
         if version is None:
-            version = self.version_manager.get_version()
+            version = self.version_manager.get_build_version()
         
-        if binary_paths is None:
-            # Auto-detect binary paths
-            binary_paths = {}
-            dist_dir = self.config.get_dist_dir(version)
+        if output_dir is None:
+            output_dir = self.config.dist_dir
             
-            for platform_dir in dist_dir.iterdir():
-                if platform_dir.is_dir() and "-" in platform_dir.name:
-                    platform_arch = platform_dir.name
-                    binary_name = self.config.get_binary_name(*platform_arch.split("-", 1))
-                    binary_path = platform_dir / binary_name
-                    
-                    if binary_path.exists():
-                        binary_paths[platform_arch] = binary_path
+        print(f"🔨 Building Homebrew formula for version {version}")
         
-        print(f"Building Homebrew formula for version {version}")
-        print(f"Binary paths: {list(binary_paths.keys())}")
+        ensure_dir(output_dir)
         
-        # Generate formula
-        formula_content = self.generate_formula(version, binary_paths)
+        # Read template
+        if not self.template_file.exists():
+            raise FileNotFoundError(f"Homebrew template not found: {self.template_file}")
+            
+        with open(self.template_file, 'r') as f:
+            template = f.read()
         
-        # Output directory
-        output_dir = self.config.get_dist_dir(version) / "homebrew"
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Find binary files and calculate checksums
+        binary_path = output_dir / "giv-macos-x86_64"
+        arm_binary_path = output_dir / "giv-macos-arm64"
+        
+        variables = {
+            "VERSION": version,
+            "HOMEPAGE": self.config.homepage,
+            "DESCRIPTION": self.config.description,
+        }
+        
+        # Add checksums if binaries exist
+        if binary_path.exists():
+            variables["MACOS_X86_64_SHA256"] = calculate_sha256(binary_path)
+            variables["MACOS_X86_64_URL"] = self.config.get_github_release_url(version, binary_path.name)
+        
+        if arm_binary_path.exists():
+            variables["MACOS_ARM64_SHA256"] = calculate_sha256(arm_binary_path)
+            variables["MACOS_ARM64_URL"] = self.config.get_github_release_url(version, arm_binary_path.name)
+        
+        # Replace template variables
+        formula_content = replace_template_vars(template, variables)
         
         # Write formula
         formula_path = output_dir / "giv.rb"
         with open(formula_path, 'w') as f:
             f.write(formula_content)
         
-        print(f"✓ Homebrew formula generated: {formula_path}")
+        print(f"📦 Homebrew formula: {formula_path.name}")
         return formula_path
     
-    def test_formula(self, formula_path: Path) -> bool:
+    def validate_formula(self, formula_path: Path) -> bool:
         """
-        Test Homebrew formula syntax.
+        Validate Homebrew formula syntax.
         
         Args:
             formula_path: Path to formula file
@@ -121,103 +101,69 @@ class HomebrewBuilder:
         Returns:
             True if formula is valid
         """
+        print("🔍 Validating Homebrew formula...")
+        
         try:
-            # Check if brew command is available
-            subprocess.run(["brew", "--version"], capture_output=True, check=True)
-            
-            # Test formula syntax
-            result = subprocess.run(
-                ["brew", "ruby", "-c", f"load '{formula_path}'"],
-                capture_output=True,
-                text=True
-            )
-            
-            if result.returncode == 0:
-                print(f"✓ Homebrew formula syntax is valid")
-                return True
-            else:
-                print(f"✗ Homebrew formula syntax error: {result.stderr}")
-                return False
-                
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            print("Warning: brew command not available, skipping formula validation")
-            return True  # Assume valid if we can't test
-    
-    def create_tap_structure(self, version: str, formula_path: Path) -> Path:
-        """
-        Create Homebrew tap directory structure.
-        
-        Args:
-            version: Version string
-            formula_path: Path to formula file
-            
-        Returns:
-            Path to tap directory
-        """
-        tap_dir = self.config.get_dist_dir(version) / "homebrew-tap"
-        tap_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create Formula directory
-        formula_dir = tap_dir / "Formula"
-        formula_dir.mkdir(exist_ok=True)
-        
-        # Copy formula to tap directory
-        tap_formula_path = formula_dir / "giv.rb"
-        import shutil
-        shutil.copy2(formula_path, tap_formula_path)
-        
-        # Create tap README
-        readme_content = f"""# Homebrew Tap for giv CLI
-
-This is the official Homebrew tap for the giv CLI tool.
-
-## Installation
-
-```bash
-brew tap giv-cli/tap
-brew install giv
-```
-
-## About
-
-giv is a Git history AI assistant CLI tool that generates commit messages,
-changelogs, release notes, and announcements using AI.
-
-- Homepage: https://github.com/giv-cli/giv-py
-- Version: {version}
-"""
-        
-        with open(tap_dir / "README.md", 'w') as f:
-            f.write(readme_content)
-        
-        print(f"✓ Homebrew tap structure created: {tap_dir}")
-        return tap_dir
+            cmd = ["brew", "style", str(formula_path)]
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            print("✅ Homebrew formula syntax is valid")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Homebrew formula validation failed: {e}")
+            if e.stdout:
+                print("STDOUT:", e.stdout)
+            if e.stderr:
+                print("STDERR:", e.stderr)
+            return False
+        except FileNotFoundError:
+            print("⚠️  brew command not found, skipping validation")
+            return True
 
 
 def main():
     """CLI interface for Homebrew builder."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Build Homebrew formula for giv CLI")
+    parser = argparse.ArgumentParser(description="Build Homebrew formula")
     parser.add_argument("--version", help="Version to build (auto-detected if not provided)")
-    parser.add_argument("--test", action="store_true", help="Test formula syntax")
-    parser.add_argument("--create-tap", action="store_true", help="Create tap directory structure")
+    parser.add_argument("--output-dir", type=Path, help="Output directory for formula")
+    parser.add_argument("--validate", action="store_true", help="Validate formula only")
     
     args = parser.parse_args()
     
-    builder = HomebrewBuilder()
-    
-    # Build formula
-    formula_path = builder.build_formula(args.version)
-    
-    # Test formula
-    if args.test:
-        builder.test_formula(formula_path)
-    
-    # Create tap structure
-    if args.create_tap:
-        version = args.version or builder.version_manager.get_version()
-        builder.create_tap_structure(version, formula_path)
+    try:
+        builder = HomebrewBuilder()
+        
+        if args.validate:
+            # Find existing formula to validate
+            output_dir = args.output_dir or builder.config.dist_dir
+            formula_path = output_dir / "giv.rb"
+            
+            if formula_path.exists():
+                valid = builder.validate_formula(formula_path)
+                sys.exit(0 if valid else 1)
+            else:
+                print("No formula found to validate")
+                sys.exit(1)
+        
+        # Build formula
+        formula_path = builder.build_formula(args.version, args.output_dir)
+        
+        if not formula_path.exists():
+            print("❌ No formula was built")
+            sys.exit(1)
+        
+        # Validate formula (optional)
+        try:
+            builder.validate_formula(formula_path)
+        except Exception as e:
+            print(f"⚠️  Formula validation skipped: {e}")
+        
+        print("✅ Homebrew formula build completed successfully")
+        
+    except Exception as e:
+        print(f"❌ Homebrew formula build failed: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ name: giv
 version: "{{VERSION}}"
 summary: Git history AI assistant CLI tool
 description: |
-  giv is a CLI utility for generating changelogs and summaries.
+  {{DESCRIPTION}}
 grade: stable
 confinement: strict
 base: core22
@@ -17,7 +17,4 @@ parts:
     plugin: dump
     source: .
     organize:
-      src/giv: bin/giv
-      src/*: lib/giv/
-      templates/*: share/giv/templates/
-      docs/*: share/giv/docs/
+      giv: bin/giv
