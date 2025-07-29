@@ -110,7 +110,15 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if e.code != 0 else 0
 
     # Configure logging based on verbosity
-    if getattr(args, "verbose", 0) > 0:
+    verbose_level = getattr(args, "verbose", 0)
+    # Handle case where verbose might be a Mock object (in tests)
+    try:
+        is_verbose = verbose_level > 0
+    except TypeError:
+        # If comparison fails (e.g., Mock object), treat as verbose if truthy
+        is_verbose = bool(verbose_level)
+    
+    if is_verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)

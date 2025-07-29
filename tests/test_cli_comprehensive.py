@@ -128,7 +128,7 @@ class TestBuildParser:
         for cmd in commands:
             args = parser.parse_args(['--verbose', '--api-url', 'http://test:11434', cmd])
             assert args.command == cmd
-            assert args.verbose is True
+            assert args.verbose == 1
             assert args.api_url == 'http://test:11434'
     
     def test_build_parser_revision_parsing(self):
@@ -508,7 +508,7 @@ class TestCLIIntegration:
             result = run_command(args)
             
             assert result == 0
-            assert args.verbose is True
+            assert args.verbose == 1
             assert args.dry_run is True
             assert args.api_url == 'http://localhost:11434'
             assert args.api_key == 'test_key'
@@ -533,8 +533,8 @@ class TestCLIEdgeCases:
         parser = build_parser()
         args = parser.parse_args(['--verbose'])
         assert args.command is None  # No default in parser itself
-        assert args.verbose is True
-        assert args.verbose is True
+        assert args.verbose == 1
+        # Remove duplicate assertion
     
     def test_run_command_with_minimal_args(self):
         """Test run_command with minimal arguments."""
@@ -557,7 +557,7 @@ class TestCLIEdgeCases:
         # These should not conflict
         args = parser.parse_args(['--dry-run', '--verbose', 'message'])
         assert args.dry_run is True
-        assert args.verbose is True
+        assert args.verbose == 1
     
     def test_unicode_in_arguments(self):
         """Test parser handles unicode in arguments."""
