@@ -72,8 +72,12 @@ class AnnouncementCommand(DocumentGeneratingCommand):
         bool
             True if successful, False otherwise
         """
-        # Use announcement-specific defaults
-        output_file = output_file or getattr(self.args, 'output_file', None) or self.config.get(CONFIG_ANNOUNCEMENT_FILE) or DEFAULT_ANNOUNCEMENT_FILE
+        # Use announcement-specific defaults with version-based naming  
+        if not output_file and not getattr(self.args, 'output_file', None) and not self.config.get(CONFIG_ANNOUNCEMENT_FILE):
+            version = output_version or ProjectMetadata.get_version() or "unknown"
+            output_file = f"{version}_announcement.md"
+        else:
+            output_file = output_file or getattr(self.args, 'output_file', None) or self.config.get(CONFIG_ANNOUNCEMENT_FILE) or DEFAULT_ANNOUNCEMENT_FILE
         output_mode = getattr(self.args, 'output_mode', None) or self.config.get(CONFIG_OUTPUT_MODE) or OUTPUT_MODE_AUTO
         output_version = getattr(self.args, 'output_version', None) or self.config.get(CONFIG_OUTPUT_VERSION) or ProjectMetadata.get_version()
         

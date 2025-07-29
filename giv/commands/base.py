@@ -17,7 +17,8 @@ from typing import Dict, List, Optional
 from ..config import ConfigManager
 from ..constants import (
     DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, DEFAULT_REVISION,
-    TEMPERATURE_CREATIVE, CONFIG_TEMPERATURE, CONFIG_MAX_TOKENS
+    TEMPERATURE_CREATIVE, CONFIG_TEMPERATURE, CONFIG_MAX_TOKENS,
+    CONFIG_TODO_PATTERN, CONFIG_TODO_FILE
 )
 from ..errors import handle_error, TemplateError
 from ..lib.git import GitRepository
@@ -123,10 +124,21 @@ class BaseCommand(ABC):
         else:
             git_metadata = self.history.build_history_metadata(primary_revision)
         
+        # Scan for TODO items if enabled and integrate with summary
+        todo_content = self._scan_todos()
+        
+        # If TODO content is found, append it to the commit summaries
+        if todo_content and commit_summaries:
+            enhanced_summaries = f"{commit_summaries}\n\n{todo_content}"
+        elif todo_content:
+            enhanced_summaries = todo_content
+        else:
+            enhanced_summaries = commit_summaries
+        
         # Build context with commit summaries as the primary content
         context = {
-            "SUMMARY": commit_summaries,  # Generated commit summaries
-            "HISTORY": commit_summaries,  # Alias for compatibility
+            "SUMMARY": enhanced_summaries,  # Generated commit summaries + TODO items
+            "HISTORY": enhanced_summaries,  # Alias for compatibility
             "REVISION": revision or "HEAD",
             "PROJECT_TITLE": ProjectMetadata.get_title(),
             "VERSION": ProjectMetadata.get_version(),
@@ -137,11 +149,36 @@ class BaseCommand(ABC):
             "MESSAGE_BODY": git_metadata["message_body"],
             "AUTHOR": git_metadata["author"],
             "BRANCH": git_metadata["branch"],
+            "TODOS": todo_content,  # Also available as separate variable
             "EXAMPLE": "",  # TODO: Add example context if needed
             "RULES": "",   # TODO: Add rules context if needed
         }
         
         return context
+    
+    def _scan_todos(self) -> str:
+        """Scan for TODO items based on configuration.
+        
+        Returns
+        -------
+        str
+            Formatted TODO items for template inclusion
+        """
+        # Get TODO scanning configuration
+        todo_pattern = (getattr(self.args, 'todo_pattern', None) or 
+                       self.config.get(CONFIG_TODO_PATTERN) or 
+                       "TODO|FIXME|XXX")
+        
+        todo_files = (getattr(self.args, 'todo_files', None) or 
+                     self.config.get(CONFIG_TODO_FILE) or 
+                     "**/*")
+        
+        try:
+            from ..lib.todo import scan_todos
+            return scan_todos(pattern=todo_pattern, file_pattern=todo_files)
+        except Exception as e:
+            logger.warning(f"TODO scanning failed: {e}")
+            return ""
     
     def create_llm_client(self) -> LLMClient:
         """Create and configure an LLM client instance.
