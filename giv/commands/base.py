@@ -24,6 +24,7 @@ from ..lib.git import GitRepository
 from ..lib.llm import LLMClient
 from ..lib.output import write_output
 from ..lib.metadata import ProjectMetadata
+from ..lib.summarization import CommitSummarizer
 from ..lib.templates import TemplateEngine
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ class BaseCommand(ABC):
         self.config = config_manager
         self.history = GitRepository()
         self.template_mgr = TemplateEngine()
+        self.summarizer = CommitSummarizer(self.history)
     
     @abstractmethod
     def run(self) -> int:
@@ -79,7 +81,12 @@ class BaseCommand(ABC):
         return revision, pathspec if pathspec else None
     
     def build_template_context(self, revision: str, pathspec: Optional[List[str]] = None) -> Dict[str, str]:
-        """Build template context with git metadata and project information.
+        """Build template context with commit summaries and project information.
+        
+        This implements the core workflow from Section 12.0 of the specification:
+        1. Parse commits from revision 
+        2. Generate summaries for each commit (with caching)
+        3. Build final template context using cached summaries
         
         Parameters
         ----------
@@ -93,16 +100,33 @@ class BaseCommand(ABC):
         Dict[str, str]
             Template context dictionary
         """
-        # Get diff content
-        diff_text = self.history.get_diff(revision=revision, paths=pathspec)
+        # Create LLM client for summarization if needed
+        llm_client = self.create_llm_client()
         
-        # Get git metadata
-        git_metadata = self.history.build_history_metadata(revision or "HEAD")
+        # Use the new summarization workflow
+        try:
+            # Generate commit summaries (this handles caching automatically)
+            commit_summaries = self.summarizer.summarize_target(
+                revision or "--current", 
+                pathspec, 
+                llm_client
+            )
+        except Exception as e:
+            logger.warning(f"Failed to generate commit summaries, falling back to diff: {e}")
+            # Fallback to raw diff if summarization fails
+            commit_summaries = self.history.get_diff(revision=revision, paths=pathspec)
         
-        # Build context
+        # Get git metadata for the primary revision
+        primary_revision = revision or "HEAD"
+        if revision in ("--current", "--cached", ""):
+            git_metadata = self.history.build_history_metadata("HEAD")
+        else:
+            git_metadata = self.history.build_history_metadata(primary_revision)
+        
+        # Build context with commit summaries as the primary content
         context = {
-            "SUMMARY": diff_text,
-            "HISTORY": diff_text, 
+            "SUMMARY": commit_summaries,  # Generated commit summaries
+            "HISTORY": commit_summaries,  # Alias for compatibility
             "REVISION": revision or "HEAD",
             "PROJECT_TITLE": ProjectMetadata.get_title(),
             "VERSION": ProjectMetadata.get_version(),

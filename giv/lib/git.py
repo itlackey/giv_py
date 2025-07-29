@@ -350,6 +350,246 @@ class GitRepository:
             logger.debug("git executable not found")
             return ""
 
+    def get_cache_path(self, commit: str, cache_type: str = "summary") -> Path:
+        """Get the cache file path for a commit.
+        
+        Parameters
+        ----------
+        commit : str
+            Commit hash or reference
+        cache_type : str
+            Type of cache (summary, history)
+            
+        Returns
+        -------
+        Path
+            Path to the cache file
+        """
+        giv_home = Path.cwd() / ".giv"
+        cache_dir = giv_home / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / f"{commit}-{cache_type}.md"
+
+    def get_cached_summary(self, commit: str) -> Optional[str]:
+        """Get cached summary for a commit if it exists.
+        
+        Parameters
+        ----------
+        commit : str
+            Commit hash or reference
+            
+        Returns
+        -------
+        Optional[str]
+            Cached summary content, or None if not cached
+        """
+        cache_path = self.get_cache_path(commit, "summary")
+        if cache_path.exists():
+            try:
+                content = cache_path.read_text(encoding='utf-8')
+                # Verify cache has proper metadata format
+                if content.startswith("Commit:"):
+                    logger.debug(f"Cache hit for commit: {commit}")
+                    return content
+                else:
+                    logger.debug(f"Cache exists but lacks metadata, removing: {cache_path}")
+                    cache_path.unlink()
+            except (OSError, IOError) as e:
+                logger.warning(f"Failed to read cache file {cache_path}: {e}")
+        return None
+
+    def cache_summary(self, commit: str, summary: str) -> None:
+        """Cache a summary for a commit.
+        
+        Parameters
+        ----------
+        commit : str
+            Commit hash or reference
+        summary : str
+            Summary content to cache
+        """
+        cache_path = self.get_cache_path(commit, "summary")
+        try:
+            cache_path.write_text(summary, encoding='utf-8')
+            logger.debug(f"Cached summary for commit {commit} at {cache_path}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to cache summary for {commit}: {e}")
+
+    def build_commit_history(self, commit: str, pathspec: Optional[List[str]] = None) -> str:
+        """Build detailed history for a single commit in Markdown format.
+        
+        This matches the build_history function from the shell implementation.
+        
+        Parameters
+        ----------
+        commit : str
+            Commit hash or reference  
+        pathspec : Optional[List[str]]
+            Optional path specifications to limit analysis
+            
+        Returns
+        -------
+        str
+            Formatted commit history in Markdown
+        """
+        # Check for cached history
+        history_cache = self.get_cache_path(commit, "history")
+        if history_cache.exists():
+            try:
+                return history_cache.read_text(encoding='utf-8')
+            except (OSError, IOError):
+                pass  # Continue to regenerate if cache read fails
+
+        # Build history content
+        history_parts = []
+        
+        # Commit header
+        history_parts.append(f"### Commit ID {commit}")
+        history_parts.append(f"**Date:** {self.get_commit_date(commit)}")
+        
+        # Version if available
+        from .metadata import ProjectMetadata
+        try:
+            version = ProjectMetadata.get_version(commit)
+            if version and version != "unknown":
+                history_parts.append(f"**Version:** {version}")
+        except Exception:
+            pass  # Version detection failed, continue without it
+        
+        # Commit message
+        message = self.get_commit_message(commit) or "No commit message"
+        history_parts.append(f"**Message:** {message}")
+        
+        # Get diff content
+        diff_content = self.get_diff(commit, pathspec)
+        if diff_content.strip():
+            # Get diff stats if available
+            diff_stats = self._get_diff_stats(commit, pathspec)
+            if diff_stats:
+                history_parts.append(f"```diff\n{diff_content}\n{diff_stats}\n```")
+            else:
+                history_parts.append(f"```diff\n{diff_content}\n```")
+        
+        # TODO: Add TODO changes extraction if needed
+        # This would require implementing extract_todo_changes equivalent
+        
+        history_content = "\n".join(history_parts)
+        
+        # Cache the history
+        try:
+            history_cache.write_text(history_content, encoding='utf-8')
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to cache history for {commit}: {e}")
+        
+        return history_content
+
+    def _get_diff_stats(self, commit: str, pathspec: Optional[List[str]] = None) -> str:
+        """Get diff statistics for a commit.
+        
+        Parameters
+        ----------
+        commit : str
+            Commit hash or reference
+        pathspec : Optional[List[str]]
+            Optional path specifications
+            
+        Returns
+        -------
+        str
+            Diff statistics output
+        """
+        cmd = ["git", "--no-pager", "diff", "--stat"]
+        
+        if commit == "--cached":
+            cmd.append("--cached")
+        elif commit == "--current" or commit == "":
+            pass  # No additional args for current changes
+        else:
+            cmd.append(f"{commit}^!")
+        
+        if pathspec:
+            cmd.append("--")
+            cmd.extend(pathspec)
+        
+        return self._run_git_command(cmd).strip()
+
+    def parse_commit_list(self, revision: str) -> List[str]:
+        """Parse a revision specification into a list of commits.
+        
+        Handles ranges like HEAD~3..HEAD, single commits, and special revisions.
+        
+        Parameters  
+        ----------
+        revision : str
+            Git revision specification
+            
+        Returns
+        -------
+        List[str]
+            List of commit hashes or special revision names
+        """
+        # Handle special revisions
+        if revision in ("--current", "--cached", ""):
+            return [revision or "--current"]
+        
+        # Handle commit ranges
+        if ".." in revision:
+            if "..." in revision:
+                # Three-dot range (symmetric difference)
+                left, right = revision.split("...", 1)
+            else:
+                # Two-dot range (commits reachable from right but not left)
+                left, right = revision.split("..", 1)
+            
+            # Validate both endpoints
+            for endpoint in [left, right]:
+                if not self._is_valid_commit(endpoint):
+                    raise ValueError(f"Invalid commit in range: {endpoint}")
+            
+            # Get commit list for the range
+            cmd = ["git", "rev-list", "--reverse", revision]
+            output = self._run_git_command(cmd).strip()
+            if output:
+                commits = output.split('\n')
+                # For ranges, also include the left endpoint if it's not included
+                if left not in commits and self._is_valid_commit(left):
+                    commits.insert(0, left)
+                return commits
+            else:
+                return []
+        
+        # Single commit
+        if self._is_valid_commit(revision):
+            return [revision]
+        else:
+            raise ValueError(f"Invalid revision: {revision}")
+
+    def _is_valid_commit(self, commit: str) -> bool:
+        """Check if a commit reference is valid.
+        
+        Parameters
+        ----------
+        commit : str
+            Commit hash or reference
+            
+        Returns
+        -------
+        bool
+            True if commit is valid
+        """
+        if commit in ("--current", "--cached"):
+            return True
+        
+        cmd = ["git", "rev-parse", "--verify", f"{commit}^{{commit}}"]
+        result = subprocess.run(
+            cmd,
+            cwd=self.repo_path,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False
+        )
+        return result.returncode == 0
+
 
 # Backward compatibility alias
 GitHistory = GitRepository
