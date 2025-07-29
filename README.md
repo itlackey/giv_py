@@ -158,7 +158,7 @@ giv message --prompt-file custom-prompt.md
 
 ### Available Templates
 - `message_prompt.md` - Commit message generation
-- `summary_prompt.md` - Project summaries
+- `summary_prompt.md` - Change summaries
 - `changelog_prompt.md` - Changelog entries
 - `release_notes_prompt.md` - Release documentation
 - `announcement_prompt.md` - Marketing announcements

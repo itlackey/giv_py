@@ -1,0 +1,38 @@
+- CHORE: write doc on using external APIs
+- CHORE: Add examples of using giv with various workflows. ie. npm run giv
+- DOCUMENTATION: Add example of using custom prompt and rules with document subcommand
+- DOCUMENTATION: Add example of adding a new document type subcommand
+- DOCUMENTATION: Add example of sourcing giv functions in other scripts
+- CHORE: Add more "real-world" tests with more detailed output validation
+  - long commit histories and summaries
+- ENHANCEMENT: add git config user.name to output
+- ENHANCEMENT: add README to summaries/prompt(?)
+- ENHANCEMENT: add date token to summary
+- FEATURE: ollama, glow, and gh cli included in docker image
+- FEATURE: use glow for output if available
+- FEATURE: GIV_USE_GLOW config setting
+- FEATURE: enhanced help command
+  - milvous cli indexes docs folder, project tree, and usage text
+  - allow `giv help "some question here"`
+  - use milvious data to provide command suggestions when command fails
+- FEATURE: chat with code/history
+- FEATURE: improve section updating (ie merge lists, update headers), improve date and header management
+- FEATURE: include [SAMPLE] token to provide current or previous section in the prompt
+- FEATURE: markdown lint and fixing before output
+- FEATURE: option to manually review and update before saving
+- FEATURE: option to use LLM to automatically review before final output
+  - reviews format and attempts to correct it or sends for a retry
+- FEATURE: add --no-pager option for when writing to stdout (ie. review or no output-file), default to true for message
+
+- ENHANCEMENT: allow user to specify (regex?) patterns for matching sections, headers, versions, todos
+- ENHANCEMENT: improve prompt with more specific todo rules. ie. BUG->FIXED changes go in ### Fixed sub section
+- FEATURE: Add roadmap document type
+- FEATURE: chat with TODOs
+- FEATURE: Improve rules and examples handling
+  - --rules-file
+  - --example-file - if "auto" attempt to extract section from output-file
+- **Interactive Mode (Optional):**
+  - Add an `--interactive` flag to review, confirm, or regenerate model output before saving.
+- contributing subcommand and document type
+- readme subcommand and document type
+- license subcommand and document type that pulls license content from web?

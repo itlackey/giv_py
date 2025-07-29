@@ -187,7 +187,7 @@ The `summarize_commit` function in **history.sh** orchestrates:
 
 1. Generating raw history with `build_history`.
 2. Finding version info via `get_version_info`.
-3. Building an AI prompt (`build_prompt` with `summary_prompt.md`).
+3. Building an AI prompt (`build_prompt` with `commmit_summary_prompt.md`).
 4. Generating the summary (`generate_response`).
    Caching ensures repeated calls skip regeneration ([history.sh][8], [llm.sh][6]).
 

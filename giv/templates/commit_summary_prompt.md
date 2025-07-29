@@ -1,13 +1,12 @@
 # Summary Request
 Project: [PROJECT_TITLE] 
 
-
-## Recent Changes
+## Git Diff
 [SUMMARY]
 
 ## Instructions
 
-Write a structured, summary of the recent changes.
+Write a structured, Keep a Changelog–style summary of the provided git diff. Do not include any version headings or other releases—just one section of grouped changes with type prefixes for each list item.
 
 1. Overview  
    - Begin with a section summarizing all of the changes, and the purpose and scope of these changes.
@@ -51,20 +50,21 @@ Write a structured, summary of the recent changes.
    - Describe any security patches or vulnerability fixes.
 
 3. Formatting & Tone  
-   - Use bullet points (`- `) under each heading  
+   - Use bullet points (`- `) under each heading.  
+   - Keep each bullet under 120 characters.  
    - Write in natural, professional language—avoid raw diff syntax.  
    - Group related items together and maintain logical order.
    - Do not include groups with no related items.
    - Each list item should provide enough detail to understand the change.
+   - Include file paths and line numbers along when possible.
 
 4. Processing Instructions  
-   - Review the provided change summaries.  
-   - Assign changes to the appropriate group above.  
+   - Parse the git diff to detect each change’s type.  
+   - Assign changes to the appropriate group above.
+   - Ensure all changes are accounted for in the list.
    - Extract file paths or components when pertinent.  
    - If possible, explain "what" changed, "why," and the "impact."
    - Only use information provided in this content in your response.
-   - Consolidate related changes from different summaries to avoid duplicating information.
-   - Determine if older changes have been superseded and use only the latest information.
 
 [EXAMPLE]
 [RULES]

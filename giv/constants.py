@@ -36,8 +36,8 @@ CONFIG_ANNOUNCEMENT_FILE = "announcement_file"
 DEFAULT_REVISION = "--current"
 
 # Template names
-TEMPLATE_MESSAGE = "message_prompt.md"
-TEMPLATE_SUMMARY = "final_summary_prompt.md"
+TEMPLATE_MESSAGE = "commit_message_prompt.md"
+TEMPLATE_SUMMARY = "summary_prompt.md"
 TEMPLATE_CHANGELOG = "changelog_prompt.md"
 TEMPLATE_RELEASE_NOTES = "release_notes_prompt.md"
 TEMPLATE_ANNOUNCEMENT = "announcement_prompt.md"

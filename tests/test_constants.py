@@ -146,7 +146,7 @@ class TestTemplateConstants:
     def test_template_names(self):
         """Test template name values."""
         assert TEMPLATE_MESSAGE == "message_prompt.md"
-        assert TEMPLATE_SUMMARY == "final_summary_prompt.md"
+        assert TEMPLATE_SUMMARY == "summary_prompt.md"
         assert TEMPLATE_CHANGELOG == "changelog_prompt.md"
         assert TEMPLATE_RELEASE_NOTES == "release_notes_prompt.md"
         assert TEMPLATE_ANNOUNCEMENT == "announcement_prompt.md"
@@ -168,7 +168,7 @@ class TestTemplateConstants:
         ]
         for template in templates:
             assert isinstance(template, str)
-            assert "_prompt.md" in template or template == "final_summary_prompt.md"
+            assert "_prompt.md" in template or template == "summary_prompt.md"
 
 
 class TestOutputModeConstants:

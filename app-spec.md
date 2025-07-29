@@ -1,5 +1,7 @@
 # Giv CLI Application Specification
 
+Sections 2,3,5,7,9,12 need corrections
+
 ## 1. Application Overview
 
 **Giv** is an AI-powered command-line interface tool that generates polished commit messages, changelogs, release notes, summaries, and announcements from Git repository history. The application transforms raw Git diffs and metadata into professionally formatted content using large language models.
@@ -22,7 +24,7 @@
 
 ### 2.1 Basic Command Pattern
 ```
-giv [global-options] <command> [command-options] [revision] [pathspec...]
+giv [global-options] <command> [revision] [pathspec...] [command-options] 
 ```
 
 ### 2.2 Global Options (must appear before subcommand)
@@ -37,16 +39,16 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 |--------|-------------|---------|
 | `--api-url <url>` | Remote API endpoint URL | None |
 | `--api-key <key>` | API authentication key (prefer environment variables) | None |
-| `--api-model <model>` | LLM model name | "default" |
-| `--model <model>` | Alias for --api-model | "default" |
-| `--output-mode <mode>` | Output mode: auto/prepend/append/update/overwrite/none | auto |
+| `--api-model <model>` | LLM model name | `"default"` |
+| `--model <model>` | Alias for --api-model | `"default"` |
+| `--output-mode <mode>` | Output mode: auto/prepend/append/update/overwrite/none | `auto` |
 | `--output-file <file>` | Write output to file instead of stdout | None |
-| `--output-version <version>` | Version string for versioned content | Auto-detected |
 | `--prompt-file <file>` | Custom prompt template file, required for document subcommand | None |
 | `--todo-files <pathspec>` | Files to scan for TODO items | `**/*` |
 | `--todo-pattern <regex>` | Regex pattern for TODO matching | `TODO\|FIXME\|XXX` |
 | `--version-file <pathspec>` | Files to inspect for version information | Project-specific |
 | `--version-pattern <regex>` | Regex pattern for version extraction | SemVer default |
+| `--version <version>` | Version string for versioned content, defaults to auto-detected | `auto` |
 
 ## 3. Subcommands
 
@@ -65,6 +67,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - `--current` (default): Working tree changes
 - `--cached`: Staged changes only
 - Git revision syntax: `HEAD~3..HEAD`, `v1.0.0..HEAD`, etc.
+  - Revisions other than `--current` and `--cached` will return existing commit message
 
 **Output**: 
 - Formatted commit message suitable for `git commit -m`
@@ -89,7 +92,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 ### 3.3 Changelog Command
 **Usage**: `giv [options] changelog [revision] [pathspec...] [command options]`
 
-**Purpose**: Generate or update changelog files following Keep a Changelog standard
+**Purpose**: Generate or update changelog files following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standard
 
 **Behavior**:
 - Automatically detects project version from metadata files
@@ -123,9 +126,9 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - Creates formal release documentation
 - Integrates with Git tags for version information
 - Professional tone suitable for public release announcements
-- Default output mode is `overwrite` to replace entire file
+- Default output mode is `overwrite` to replace entire file if it exists
 
-**Default Output File**: `RELEASE_NOTES_{VERSION}.md`
+**Default Output File**: `{VERSION}_release_notes.md`
 
 **Output**: Professional release notes with version highlights and changes
 
@@ -140,7 +143,7 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - Suitable for blog posts, social media, and public announcements
 - Marketing-oriented language and structure
 
-**Default Output File**: `ANNOUNCEMENT_{VERSION}.md`
+**Default Output File**: `{VERSION}_announcement.md`
 
 **Output**: Engaging announcement content with marketing focus
 
@@ -158,6 +161,8 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - Supports all template variables and substitution
 - Flexible content generation for unique requirements
 
+**Default Output File**: `{VERSION}_document.md`
+
 ### 3.7 Config Command
 **Usage**: `giv config <operation> [key] [value]`
 - CLI options/args matches `git config` for configuration operations
@@ -167,20 +172,26 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 - `get <key>`: Retrieve specific configuration value
 - `set <key> <value>`: Set configuration value
 - `unset <key>`: Remove configuration value
+- If no operation is provided, defaults to `list`
 
 **Configuration Keys** (dot notation):
 - `api.url`: API endpoint URL
 - `api.key`: API authentication key (environment variables preferred)  
-- `api.model`: Default model name
-- `temperature`: LLM temperature setting (0.0-2.0)
-- `max_tokens`: Maximum response tokens
-- `timeout`: API request timeout (seconds)
-- `output.mode`: Default output mode
+- `api.model.name`: Default model name
+- `api.model.temperature`: LLM temperature setting (0.0-2.0)
+- `api.model.max_tokens`: Maximum response tokens
+- `api.model.timeout`: API request timeout (seconds)
 - `project.title`: Project title override
-- `changelog.file`: Changelog filename
+- `project.description`: Project description
+- `project.url`: Project URL
+- `project.type`: Project type (auto-detected: node, python, rust, custom)
 - `todo.file`: Pathspec to search for TODO items
 - `todo.pattern`: RegEx pattern to locate TODO items
-- Also supports version file and pattern
+- `todo.label.[key]`: Description to replace key with (fix = "Bug Fixed", add = "New Feature Added")
+- `version.file`: Pathspec to inspect for version information (alias for version.file)
+- `version.pattern`: Regex pattern for version extraction (alias for version.pattern)
+- `output.mode`: Default output mode
+- `changelog.file`: Changelog file path
 
 ### 3.8 Init Command
 **Usage**: `giv init`
@@ -212,13 +223,13 @@ giv [global-options] <command> [command-options] [revision] [pathspec...]
 ```ini
 # Key-value pairs with dot notation
 api.url=https://api.openai.com/v1/chat/completions
-api.model=gpt-4
 api.key="ENV varibale key" # This sets what ENV var to use, DO NOT store keys in config
-output.mode=auto
-temperature=0.8
-max_tokens=8192
+api.model.name=gpt-4
+api.model.temperature=0.8
+api.model.max_tokens=8192
 project.title="My Project"
 changelog.file=CHANGELOG.md
+output.mode=auto
 ```
 
 ### 4.3 Environment Variable Mapping
@@ -236,8 +247,9 @@ changelog.file=CHANGELOG.md
 3. **System templates**: Bundled with application
 
 ### 5.2 Built-in Templates
-- `message_prompt.md`: Commit message generation
-- `final_summary_prompt.md`: Technical summaries
+- `commit_message_prompt.md`: Commit message generation
+- `commit_summary_prompt.md`: Commit summary generation
+- `summary_prompt.md`: Technical summaries
 - `changelog_prompt.md`: Changelog entries
 - `release_notes_prompt.md`: Release documentation
 - `announcement_prompt.md`: Marketing announcements
@@ -247,17 +259,16 @@ Templates support variable substitution with `{VARIABLE}` syntax:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `{SUMMARY}` | LLM generated summary of Git diff content | Produced for each commit |
-| `{HISTORY}` |Git diff content | Unified diff output |
+| `{HISTORY}` |Git diff content | Unified diff output used in commit message and commit summary |
+| `{SUMMARY}` | LLM generated summary of Git diff content | Produced for given revision |
 | `{PROJECT_TITLE}` | Project name | "My Application" |
 | `{VERSION}` | Version string | "1.2.0" |
-| `{OUTPUT_VERSION}` | Specified output version | "1.2.0" |
 | `{COMMIT_ID}` | Full commit hash | "a1b2c3d4..." |
 | `{SHORT_COMMIT_ID}` | Abbreviated hash | "a1b2c3d" |
+| `{BRANCH}` | Current Git branch | "main" |
 | `{DATE}` | Commit or current date | "2024-01-15" |
 | `{MESSAGE}` | Commit message | "Fix authentication bug" |
-| `{BRANCH}` | Current Git branch | "main" |
-| `{REVISION}` | Specified revision | "HEAD~3..HEAD" |
+| `{AUTHOR}`   | Git user name for the commit |
 
 ## 6. Git Integration
 
@@ -287,8 +298,9 @@ Automatically detects project information from:
 | Go | `go.mod` | module name, version |
 | PHP | `composer.json` | name, version, description |
 | Java | `pom.xml`, `build.gradle` | name, version, description |
-| Generic | `VERSION`, `version.txt` | version string |
+| Giv | `.giv/config` | name, version, description |
 | Git | Tags, commit history | version tags |
+| Custom | `--version-file` & `--version-pattern` | version
 
 **Version Format Support**:
 - Semantic versioning (1.2.3)
@@ -302,6 +314,7 @@ Automatically detects project information from:
 - **`auto`**: Intelligent mode selection:
   - Changelog command: `update` or `prepend` if the section is missing
   - Release notes command: `overwrite`
+  - Announcement command: `overwrite`
   - Other commands: `none` (stdout)
 - **`prepend`**: Add content to beginning of file
 - **`append`**: Add content to end of file
@@ -313,12 +326,13 @@ Automatically detects project information from:
 - **Section management**: Version-aware updates for structured files
 - **Format preservation**: Maintains existing file structure and formatting
 - **Encoding**: UTF-8 encoding throughout application
+- **Output Linting**: All output should pass basic markdown linting
 
 ## 8. AI Provider Support
 
 ### 8.1 Supported API Types
-- **OpenAI**: GPT-3.5, GPT-4, GPT-4o series models
-- **Anthropic**: Claude 3.5 Sonnet and other Claude models  
+- **OpenAI**
+- **Anthropic**  
 - **Local models**: Ollama and other OpenAI-compatible endpoints
 - **Custom APIs**: Any service implementing OpenAI ChatCompletion format
 
@@ -354,16 +368,16 @@ giv config set api.model "llama3.2"
 - **Pattern matching**: Custom regex via `--todo-pattern`
 - **File filtering**: Specific files via `--todo-files`
 - **Integration**: TODO items included in generated content
-- **Default patterns**: Matches `TODO`, `FIXME`, `XXX` comments
+- **Default patterns**: Matches `TODO`, `FIXME`, `ADD` comments
 
 ### 9.2 Version Management
-- **Automatic detection**: Extracts versions from project files
+- **Automatic detection**: Extracts versions from project files or based on `--version-file` 
 - **SemVer support**: Semantic versioning parsing and validation
 - **Custom patterns**: User-defined version regex patterns
-- **Manual override**: Explicit version specification via `--output-version`
+- **Manual override**: Explicit version specification via `--version`
 
 ### 9.3 Dry Run Mode
-- **Preview generation**: Shows what would be generated without execution
+- **Prompt generation**: Shows what would be sent to the LLM
 - **No API calls**: Skips actual LLM requests, uses prompt as output
 - **Output simulation**: Displays where content would be written
 - **Configuration testing**: Validates settings without side effects
@@ -396,6 +410,7 @@ giv config set api.model "llama3.2"
    - Windows (x86_64)
 2. **Package managers**: Homebrew, Scoop, apt, yum
 3. **PyPI installation**: `pip install giv` (requires Python 3.8.1+)
+4. **Docker**: Pull from Docker Hub or build locally
 
 ### 11.2 File System Layout
 - **User configuration**: `~/.giv/config`
@@ -409,6 +424,16 @@ giv config set api.model "llama3.2"
 - **Binary replacement**: Downloads and replaces current executable
 
 ## 12. Business Rules and Requirements
+
+### 12.0 Workflow
+1. Parse the list of commits from the provided revision
+2. Loop through each commit in the list
+   1. Create history file contain diff and metadata for a commit
+   2. Send the history file content along with the `commit_summary.md` prompt template to the LLM to get a summary of the commit
+   3. Save commit summary response in `giv/cache/[commit id]-summary.md`
+3. Create prompt for the given document type and insert the commit summaries into the associated prompt template
+4. Send final prompt to the LLM
+5. Save response from the LLM to the output file or write it to stdout
 
 ### 12.1 Content Generation Rules
 1. **Commit messages** must be clear, concise, and follow conventional format
@@ -441,17 +466,16 @@ giv config set api.model "llama3.2"
 7. **Must prioritize environment variables** for API key authentication
 
 ### 12.5 File Operation Requirements
-1. **Must create backups** before modifying existing files
-2. **Must preserve file permissions** and ownership
-3. **Must handle concurrent access** safely
-4. **Must validate write permissions** before attempting operations
-5. **Must support atomic file operations** to prevent corruption
-6. **Must exclude binary and large files** from diff processing
-7. **Must use UTF-8 encoding** for all file operations
+1. **Must preserve file permissions** and ownership
+2. **Must handle concurrent access** safely
+3. **Must validate write permissions** before attempting operations
+4. **Must support atomic file operations** to prevent corruption
+5. **Must exclude binary and large files** from diff processing
+6. **Must use UTF-8 encoding** for all file operations
 
 ### 12.6 Caching and Performance Requirements
 1. **Must cache generated commit summaries** until explicitly cleared
-2. **Must support chunking for large repositories** (future version)
+2. **Must support chunking for large commits** (future version)
 3. **Must handle project type conflicts** by prompting user when unset
 4. **Must support CI/CD integration** through environment variables
 5. **Must manage team configuration** via `.giv/config` files in repositories
@@ -486,4 +510,61 @@ giv config set api.model "llama3.2"
 - **Timeout Management**: 60-second default timeout for LLM requests
 - **Failure Handling**: Exactly 3 retry attempts before application exit
 
-This specification provides a complete foundation for building the giv CLI application, incorporating all clarifications and addressing previously pending questions. The application is designed as a focused, reliable tool for AI-assisted Git workflow enhancement with clear boundaries and well-defined extensibility patterns.
+## 14 Potential Future Features
+
+### 14.1 Performance and Scalability Enhancements
+- **Large commit chunking**: Support breaking down large diffs into chunks and returning a summary for the commit once all chunks are processed
+- **Enhanced section updating**: Improve merge lists, update headers, and better date/header management for structured documents
+- **Markdown linting and fixing**: Automatically lint and fix markdown formatting issues before output
+
+### 14.2 Content and Metadata Enhancements
+- **Git user integration**: Add `git config user.name` to template variables and output metadata
+- **README integration**: Include project README content in summaries and prompts for better context
+- **Enhanced date tokens**: Add more granular date formatting options to template variables (current implementation uses `{DATE}`)
+- **TODO label replacement**: Optionally configure todo labels and descriptions
+  - `todo.labels.bug="Bug Fixed"` in the config would replace `bug` with `Bug Fixed` in the history file that is added to the prompt
+- **Advanced TODO processing**: Improve prompt with more specific todo rules (e.g., BUG→FIXED changes go in `### Fixed` subsection)
+
+- **Advanced template system**: 
+  - `--rules-file` parameter for custom content generation rules to replace the `{RULES}` token in templates
+  - `--example-file` parameter with "auto" mode to extract examples from existing output files to replace the `{EXAMPLE}` token in templates
+- **Sample content tokens**: Include `{SAMPLE}` token to provide current or previous section content in prompts for consistency
+
+### 14.3 User Interface and Experience
+- **Glow integration**: Use [glow](https://github.com/charmbracelet/glow) for enhanced markdown rendering when available
+  - New config setting: `GIV_USE_GLOW` to enable/disable glow output
+  - Automatic detection of glow binary in PATH
+- **No-pager option**: Add `--no-pager` option for stdout output (default true for message command)
+- **Interactive mode**: Add `--interactive` flag to review, confirm, or regenerate model output before saving
+- **Manual review option**: Option to manually review and update content before saving to files
+
+### 14.4 Advanced Help and Documentation
+- **Enhanced help command**: AI-powered help system using vector search
+  - Index docs folder, project tree, and usage text using Milvus CLI
+  - Support natural language queries: `giv help "some question here"`
+  - Provide command suggestions when commands fail based on indexed documentation
+- **Chat interfaces**: 
+  - Chat with codebase/history: Interactive exploration of repository changes
+  - Chat with TODOs: Interactive management and discussion of TODO items
+
+### 14.5 Quality Assurance and Review
+- **LLM-powered automatic review**: Option to use LLM to automatically review output before final save
+  - Reviews format and attempts corrections or triggers retry
+  - Validates against Keep a Changelog standards for changelog command
+- **Advanced pattern matching**: Allow users to specify regex patterns for:
+  - Section matching in existing files
+  - Header identification and formatting
+  - Version number extraction
+  - TODO pattern customization (extends current `--todo-pattern`)
+
+### 14.6 New Document Types and Commands
+- **Roadmap document type**: Generate project roadmaps based on TODO items, issues, and planned features
+- **Contributing subcommand**: Generate CONTRIBUTING.md files with project-specific guidelines
+- **README subcommand**: Generate or update README.md files with project metadata and documentation
+- **License subcommand**: Generate LICENSE files by fetching license content from web sources
+
+### 14.7 Development and Distribution
+- **Enhanced Docker image**: Include additional CLI tools in Docker distribution:
+  - Ollama for local LLM support
+  - Glow for markdown rendering
+  - GitHub CLI (gh) for repository integration
