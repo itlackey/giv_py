@@ -26,8 +26,8 @@ from .commands import (
     ReleaseNotesCommand,
     AnnouncementCommand,
     ConfigCommand,
+    InitCommand,
 )
-from .lib.templates import TemplateEngine
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,7 @@ def run_command(args: argparse.Namespace) -> int:
         elif args.command == "update":
             return _run_update(args, cfg_mgr)
         elif args.command == "init":
-            return _run_init(args, cfg_mgr)
+            return InitCommand(args, cfg_mgr).run()
         elif args.command == "version":
             print(f"giv {__version__}")
             return 0
@@ -346,25 +346,3 @@ def _run_update(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
 
 
 
-def _run_init(args: argparse.Namespace, cfg_mgr: ConfigManager) -> int:
-    """Handle the ``init`` subcommand."""
-    # Create a .giv directory and copy default templates using template manager
-    template_mgr = TemplateEngine()
-    cwd = Path.cwd()
-    giv_dir = cwd / ".giv"
-    giv_dir.mkdir(exist_ok=True)
-    
-    # Create templates directory
-    templates_dir = giv_dir / "templates"
-    templates_dir.mkdir(exist_ok=True)
-    
-    # Copy system templates to project templates directory
-    system_templates_dir = Path(__file__).parent / "templates"
-    if system_templates_dir.exists():
-        for template_file in system_templates_dir.glob("*.md"):
-            dest = templates_dir / template_file.name
-            if not dest.exists():
-                dest.write_text(template_file.read_text(encoding='utf-8'), encoding='utf-8')
-    
-    print(f"Initialised {giv_dir}")
-    return 0

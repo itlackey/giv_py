@@ -177,6 +177,11 @@ class GitRepository:
         cmd = ["git", "show", "-s", "--format=%B", commit]
         return self._run_git_command(cmd).strip()
 
+    def get_commit_author(self, commit: str = "HEAD") -> str:
+        """Get the author name for a specific commit."""
+        cmd = ["git", "show", "-s", "--format=%an", commit]
+        return self._run_git_command(cmd).strip()
+
     def get_commit_hash(self, commit: str = "HEAD") -> str:
         """Get the full SHA hash of a commit."""
         cmd = ["git", "rev-parse", commit]
@@ -260,6 +265,7 @@ class GitRepository:
             "date": self.get_commit_date(commit),
             "message": self.get_commit_message(commit),
             "message_body": self.get_commit_message_body(commit),
+            "author": self.get_commit_author(commit),
             "branch": self.get_current_branch(),
         }
 

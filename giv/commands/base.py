@@ -111,6 +111,7 @@ class BaseCommand(ABC):
             "DATE": git_metadata["date"],
             "MESSAGE": git_metadata["message"],
             "MESSAGE_BODY": git_metadata["message_body"],
+            "AUTHOR": git_metadata["author"],
             "BRANCH": git_metadata["branch"],
             "EXAMPLE": "",  # TODO: Add example context if needed
             "RULES": "",   # TODO: Add rules context if needed
