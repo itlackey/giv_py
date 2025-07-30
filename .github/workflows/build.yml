@@ -105,6 +105,10 @@ jobs:
         shell: bash
         run: poetry install --no-interaction --no-ansi
 
+      - name: Ensure scripts are installed
+        shell: bash
+        run: poetry install --only-root --no-interaction --no-ansi
+
       - name: Run tests
         shell: bash
         run: poetry run pytest -q

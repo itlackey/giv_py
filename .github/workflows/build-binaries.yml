@@ -60,6 +60,9 @@ jobs:
     - name: Install dependencies
       run: poetry install
     
+    - name: Ensure scripts are installed
+      run: poetry install --only-root --no-interaction --no-ansi
+
     - name: Build binary
       run: poetry run build-binary
     

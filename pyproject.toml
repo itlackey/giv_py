@@ -49,7 +49,7 @@ pyinstaller = "^6.14.2"
 
 [tool.poetry.scripts]
 giv = "giv.main:main"
-build-binary = "build.build_binary:build_binary"
+build-binary = "build.build_binary:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
