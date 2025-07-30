@@ -21,8 +21,12 @@ class TestConfigManager:
         """Test ConfigManager initialization with default path."""
         # Mock home directory and change to temp dir to avoid project-level config
         old_home = os.environ.get("HOME")
+        old_userprofile = os.environ.get("USERPROFILE")
         old_cwd = os.getcwd()
+        
+        # Set both HOME and USERPROFILE for cross-platform compatibility
         os.environ["HOME"] = str(temp_dir)
+        os.environ["USERPROFILE"] = str(temp_dir)
         os.chdir(temp_dir)
         
         try:
@@ -37,6 +41,10 @@ class TestConfigManager:
                 os.environ["HOME"] = old_home
             else:
                 os.environ.pop("HOME", None)
+            if old_userprofile:
+                os.environ["USERPROFILE"] = old_userprofile
+            else:
+                os.environ.pop("USERPROFILE", None)
     
     def test_init_with_custom_path(self, temp_dir):
         """Test ConfigManager initialization with custom path."""

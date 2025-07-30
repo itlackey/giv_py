@@ -53,6 +53,7 @@ class TestTodoScanner:
         scanner = TodoScanner()
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            temp_path = f.name
             f.write("""# TODO: implement feature A
 def function():
     # FIXME: this is broken
@@ -62,15 +63,17 @@ def function():
 print("hello")
 """)
             f.flush()
-            
-            todos = scanner.scan_file(Path(f.name))
+        
+        try:
+            todos = scanner.scan_file(Path(temp_path))
             
             assert len(todos) == 3
             assert todos[0] == (1, "# TODO: implement feature A")
             assert todos[1] == (3, "# FIXME: this is broken")  # No indentation in stripped line
             assert todos[2] == (6, "# XXX: remove this hack")
-            
-            Path(f.name).unlink()
+        finally:
+            # Clean up the temporary file
+            Path(temp_path).unlink(missing_ok=True)
     
     def test_scan_directory(self):
         """Test scanning a directory for TODOs."""
@@ -159,31 +162,35 @@ class TestTodoPatternMatching:
         scanner = TodoScanner(pattern="todo")
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            temp_path = f.name
             f.write("# TODO: uppercase\n# todo: lowercase\n# Todo: mixed case")
             f.flush()
-            
-            todos = scanner.scan_file(Path(f.name))
-            
+        
+        try:
+            todos = scanner.scan_file(Path(temp_path))
             assert len(todos) == 3
-            Path(f.name).unlink()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
     
     def test_custom_patterns(self):
         """Test custom TODO patterns."""
         scanner = TodoScanner(pattern="HACK|BUG|NOTE")
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            temp_path = f.name
             f.write("# HACK: dirty hack\n# BUG: known bug\n# NOTE: important note\n# TODO: ignored")
             f.flush()
-            
-            todos = scanner.scan_file(Path(f.name))
+        
+        try:
+            todos = scanner.scan_file(Path(temp_path))
             
             assert len(todos) == 3
             assert any("HACK" in todo[1] for todo in todos)
             assert any("BUG" in todo[1] for todo in todos)
             assert any("NOTE" in todo[1] for todo in todos)
             assert not any("TODO: ignored" in todo[1] for todo in todos)
-            
-            Path(f.name).unlink()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
     
     def test_complex_regex_patterns(self):
         """Test complex regex patterns."""
@@ -191,10 +198,12 @@ class TestTodoPatternMatching:
         scanner = TodoScanner(pattern=r"TODO\([^)]+\)|TODO")
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            temp_path = f.name
             f.write("# TODO(alice): assigned todo\n# TODO: unassigned todo")
             f.flush()
-            
-            todos = scanner.scan_file(Path(f.name))
-            
+        
+        try:
+            todos = scanner.scan_file(Path(temp_path))
             assert len(todos) == 2
-            Path(f.name).unlink()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)

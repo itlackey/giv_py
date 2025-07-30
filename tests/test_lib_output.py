@@ -224,7 +224,7 @@ class TestWriteOutputEdgeCases:
             result = write_output(unicode_content, str(output_file), "overwrite")
             
             assert result is True
-            assert output_file.read_text() == unicode_content
+            assert output_file.read_text(encoding="utf-8") == unicode_content
     
     def test_write_output_large_content(self):
         """Test write_output with large content."""
