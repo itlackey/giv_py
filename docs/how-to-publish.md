@@ -1,6 +1,6 @@
 # How to Build and Publish GIV CLI Binaries
 
-This guide explains how to build and publish the `giv` CLI tool as cross-platform binaries using the Python-based build system.
+This guide explains how to build and publish the `giv` CLI tool as cross-platform binaries using the automated GitHub Actions workflows.
 
 ## Overview
 
@@ -9,53 +9,117 @@ The build system creates self-contained binary executables for multiple platform
 - **macOS** - Intel and Apple Silicon architectures  
 - **Windows** - x86_64 architecture
 - **PyPI** - Python package distribution
-- **GitHub Releases** - Direct binary downloads
+- **Package Managers** - Homebrew, Scoop, Chocolatey
+
+## Automated Release Process
+
+Publishing releases is fully automated through GitHub Actions. The process is triggered by creating and pushing a Git tag:
+
+### 1. Create and Push Release Tag
+```bash
+# Tag the current commit with version
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+### 2. Automated Workflow Execution
+The release tag triggers the `.github/workflows/release.yml` workflow which:
+
+1. **Builds binaries** for all platforms (Linux x86_64/ARM64, macOS Intel/ARM64, Windows x86_64)
+2. **Generates checksums** (SHA256) for all binaries
+3. **Creates package manager configurations** (Homebrew formula, Scoop manifest)
+4. **Publishes to PyPI** (both main and test repositories)
+5. **Creates GitHub release** with all assets attached
+
+### 3. Build Matrix Execution
+
+The system uses parallel matrix builds:
+
+```yaml
+# Platform matrix for binary builds
+matrix:
+  include:
+    - platform: linux
+      arch: x86_64
+      runner: ubuntu-latest
+    - platform: linux  
+      arch: arm64
+      runner: ubuntu-latest  # Cross-compilation
+    - platform: macos
+      arch: x86_64
+      runner: macos-13       # Intel runner
+    - platform: macos
+      arch: arm64
+      runner: macos-latest   # Apple Silicon runner
+    - platform: windows
+      arch: x86_64
+      runner: windows-latest
+```
 
 ## Build Architecture
 
-The build system uses modern Python tooling:
+The build system uses modern Python tooling with automation:
 
 - **Poetry**: Dependency management and virtual environments
 - **PyInstaller**: Python to binary compilation
 - **GitHub Actions**: Automated CI/CD pipeline
-- **build.py**: Main build orchestrator
-- **publish.py**: Publishing automation
+- **Cross-compilation**: ARM64 Linux builds on x86_64
+- **Checksums**: SHA256 verification for all binaries
 
-## Prerequisites
+## Manual Development Builds
 
-### Required Tools
+For local development and testing:
+
+### Prerequisites
 - **Python 3.8+** - For running build scripts
 - **Poetry** - Dependency management (`pip install poetry`)
 - **Git** - Version control
-- **PyInstaller** - Binary compilation (installed via Poetry)
 
-### Platform-Specific Build Requirements
+### Local Binary Building
+```bash
+# Install dependencies
+poetry install
 
-**Linux/macOS:**
-- Standard development tools (build-essential, Xcode tools)
-- No additional requirements
+# Build binary for current platform
+poetry run python build/build_binary.py
 
-**Windows:**
-- Visual Studio Build Tools or Visual Studio Community
-- Windows SDK
+# Binary created as giv-{platform}-{arch}[.exe]
+```
 
-**Cross-compilation:**
-- GitHub Actions runners (automated)
-- Docker for Linux builds on other platforms
+### Development Testing
+```bash
+# Run tests
+poetry run pytest
 
-### Authentication Setup
-Set environment variables for publishing:
+# Run specific test categories  
+poetry run pytest -m unit
+poetry run pytest -m integration
+
+# Build and test binary
+poetry run python build/build_binary.py
+./giv-linux-x86_64 --version
+```
+
+## Repository Secrets Configuration
+
+The automated workflows require these repository secrets:
 
 ```bash
 # PyPI publishing
-export PYPI_API_TOKEN="your-pypi-token"
+PYPI_API_TOKEN="your-pypi-token"
 
-# GitHub releases
-export GITHUB_TOKEN="your-github-token"
+# GitHub releases (automatically provided)
+GITHUB_TOKEN="automatically-provided-by-github"
 
 # Optional: TestPyPI for testing
-export TEST_PYPI_API_TOKEN="your-test-pypi-token"
+TEST_PYPI_API_TOKEN="your-test-pypi-token"
 ```
+
+### Required Secrets Setup in GitHub
+
+1. **PYPI_API_TOKEN**: Create token at https://pypi.org/manage/account/token/
+2. **TEST_PYPI_API_TOKEN**: Create token at https://test.pypi.org/manage/account/token/
+3. **GITHUB_TOKEN**: Automatically provided by GitHub Actions
 
 ## Quick Start
 
@@ -72,189 +136,363 @@ poetry install
 poetry shell
 ```
 
-### 2. Build Binaries
+### 2. Local Development and Testing
 ```bash
 # Build for current platform
-./build/build.py binaries
+poetry run python build/build_binary.py
 
-# Test the build
+# Run comprehensive tests
 poetry run pytest
 
-# Run type checking and linting
+# Run specific test categories
+poetry run pytest -m unit
+poetry run pytest -m integration
+
+# Type checking and linting
 poetry run mypy giv/ tests/
 poetry run black giv/ tests/
 poetry run flake8 giv/ tests/
 ```
 
-### 3. Publish Release
+### 3. Automated Release Process
 ```bash
-# Full release process
-./build/build.py release
+# Create and push a release tag
+git tag v1.2.3
+git push origin v1.2.3
 
-# Or step by step:
-./build/build.py binaries    # Build binaries
-poetry run pytest           # Run tests
-./build/publish.py all       # Publish to all channels
+# GitHub Actions automatically:
+# 1. Builds binaries for all platforms
+# 2. Runs comprehensive test suite
+# 3. Generates checksums
+# 4. Creates package manager configurations
+# 5. Publishes to PyPI
+# 6. Creates GitHub release with assets
 ```
 
-## Build System Details
+## GitHub Actions Workflows
 
-### Available Build Commands
+### Build Workflows
 
-The `build.py` script provides several automation commands:
+The project uses specialized workflows for different purposes:
 
-```bash
-# Development commands
-./build/build.py status         # Check build system status
-./build/build.py binaries       # Build binaries for current platform
-./build/build.py packages       # Build PyPI packages
-./build/build.py release        # Complete release process
-./build/build.py clean          # Clean build artifacts
+#### 1. **CI Build (build-ci.yml)**
+- **Trigger**: Pull requests, pushes to main
+- **Platforms**: Linux/macOS/Windows x86_64 only  
+- **Purpose**: Fast feedback for development
+- **Features**: Dependency caching, test execution
 
-# Publishing commands  
-./build/publish.py pypi         # Publish to PyPI
-./build/publish.py pypi --test  # Publish to TestPyPI
-./build/publish.py github       # Create GitHub release
-./build/publish.py all          # Publish to all channels
+#### 2. **Binary Build (build-binaries.yml)** 
+- **Trigger**: Called by release workflow
+- **Platforms**: All supported platforms including ARM64
+- **Purpose**: Production binary compilation
+- **Features**: Cross-compilation, checksum generation
+
+#### 3. **Release (release.yml)**
+- **Trigger**: Git tag creation (v*.*.*)
+- **Purpose**: Complete release automation
+- **Outputs**: Binaries, packages, GitHub release
+
+### Workflow Features
+
+```yaml
+# Cross-compilation setup (Linux ARM64)
+- name: Setup cross-compilation
+  run: |
+    sudo apt-get update
+    sudo apt-get install -y gcc-aarch64-linux-gnu
+    echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+# Binary naming convention
+binary_name: giv-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.platform == 'windows' && '.exe' || '' }}
+
+# Checksum generation
+- name: Generate checksums
+  run: |
+    cd dist/
+    sha256sum * > checksums.sha256
 ```
 
-### Build Configuration
+## Build System Architecture
 
-Build settings are configured in `build/core/config.py`:
+### Binary Compilation
+
+The build system uses PyInstaller with optimized settings:
 
 ```python
-# Core build configuration
-class BuildConfig:
-    PACKAGE_NAME = "giv"
-    SUPPORTED_PLATFORMS = [
-        "linux-x86_64", "linux-arm64",
-        "darwin-x86_64", "darwin-arm64", 
-        "windows-x86_64"
+# build/build_binary.py core functionality
+def build_binary():
+    """Build platform-specific binary."""
+    binary_name = get_binary_name()
+    
+    # PyInstaller configuration
+    command = [
+        "pyinstaller",
+        "--onefile",          # Single executable
+        "--name", binary_name, 
+        "--distpath", "dist/",
+        "giv/__main__.py"     # Entry point
     ]
-    BINARY_NAME_FORMAT = "giv-{platform}-{arch}"
+    
+    subprocess.run(command, check=True)
 ```
 
-## Detailed Workflow
+### Package Manager Integration
 
-### Step 1: Binary Compilation
+Package managers are updated automatically during releases:
 
-Binaries are compiled using PyInstaller:
-```bash
-# Build for current platform
-./build/build.py binaries
+```python
+# build/homebrew/build.py - Homebrew tap creation
+def create_tap_structure(tap_dir):
+    """Create Homebrew tap directory structure."""
+    formula_dir = tap_dir / "Formula"
+    formula_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate formula file
+    generate_formula(formula_dir / "giv.rb")
 
-# Build for specific platforms
-./build/build.py binaries --platforms linux-x86_64,darwin-arm64
-
-# Build all supported platforms
-./build/build.py binaries --all-platforms
+# build/scoop/build.py - Scoop bucket creation  
+def create_bucket_structure(bucket_dir):
+    """Create Scoop bucket structure."""
+    bucket_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate manifest
+    generate_manifest(bucket_dir / "giv.json")
 ```
 
-### Step 2: Package Generation
+## Release Process Details
 
-#### Build Package Manager Configurations
+### Automated Release Steps
+
+When a tag is pushed, the release workflow executes these steps:
+
+#### 1. **Preparation**
+- Checkout code with full history
+- Setup Python and Poetry
+- Install dependencies
+- Validate project configuration
+
+#### 2. **Binary Compilation**
+- Matrix build across all platforms
+- Cross-compilation for ARM64 Linux
+- PyInstaller optimization
+- Binary verification testing
+
+#### 3. **Package Generation**
+- Homebrew formula with tap structure
+- Scoop manifest with bucket structure  
+- Chocolatey package specification
+- PyPI wheel and source distributions
+
+#### 4. **Publishing**
+- Upload to PyPI (main repository)
+- Upload to TestPyPI (for testing)
+- Create GitHub release with assets
+- Generate and attach checksums
+
+#### 5. **Validation**
+- Verify all uploads completed
+- Test download URLs
+- Validate package manager integrations
+
+### Binary Testing and Validation
+
+Each compiled binary undergoes automated validation:
+
 ```bash
-# Build Homebrew formula
-python build/homebrew/build.py
-
-# Build Scoop manifest
-python build/scoop/build.py
-
-# Build PyPI packages
-python build/pypi/build.py
+# Validation tests run by GitHub Actions
+./giv-{platform}-{arch} --version    # Version check
+./giv-{platform}-{arch} --help       # Help output
+./giv-{platform}-{arch} config view  # Config functionality
 ```
 
-Built artifacts are stored in `./dist/` organized by platform and package type.
+#### Test Matrix Results
+The release process validates binaries across platforms:
 
-### Step 3: Binary Testing
-
-The build system includes automated testing of compiled binaries:
-
-#### Test Built Binaries
-```bash
-# Test binary functionality
-python build/pyinstaller/binary_builder.py --test
-
-# Test all platform binaries (if available)
-python build/pyinstaller/build_all_platforms.py --test
 ```
-
-#### Validation Process
-- Binary execution test (--version, --help)
-- Core functionality verification
-- Dependency validation
-- Size and performance checks
-
-#### Understanding Test Results
-```bash
 ========================================
 BINARY VALIDATION SUMMARY  
 ========================================
-Platform: linux-x86_64
-Binary: ./dist/giv-linux-x86_64
-Size: 15.2 MB
-Tests: PASSED
+✅ Linux x86_64   - giv-linux-x86_64    (14.8 MB)
+✅ Linux ARM64    - giv-linux-arm64     (14.9 MB)  
+✅ macOS Intel    - giv-macos-x86_64    (15.1 MB)
+✅ macOS ARM64    - giv-macos-arm64     (14.7 MB)
+✅ Windows x86_64 - giv-windows-x86_64  (15.3 MB)
 ========================================
+All binaries validated successfully.
 ```
 
-### Step 4: Publishing
+## Troubleshooting
 
-#### Publish to All Channels
+### Common Release Issues
+
+#### 1. **Tag Creation Problems**
 ```bash
-# Publish complete release
-./build/publish.py all
+# Ensure tag follows version pattern
+git tag -l | grep v1.2.3
 
-# Publish to specific channels
-./build/publish.py pypi
-./build/publish.py github
-./build/publish.py package-managers
+# Delete and recreate tag if needed
+git tag -d v1.2.3
+git push origin :refs/tags/v1.2.3
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
-#### Publishing Process
-1. **PyPI**: Upload Python package to PyPI
-2. **GitHub**: Create release with binary attachments
-3. **Package Managers**: Update Homebrew/Scoop configurations
-4. **Verification**: Validate all uploads succeeded
+#### 2. **Build Failures**
+Check the GitHub Actions logs for specific error details:
 
-#### Publishing Options
+- **Linux ARM64**: Cross-compilation toolchain issues
+- **macOS**: Code signing or architecture problems  
+- **Windows**: Visual Studio Build Tools missing
+- **PyPI**: Authentication token or package conflicts
+
+#### 3. **Publishing Failures**
+Common publishing issues and solutions:
+
 ```bash
-./build/publish.py [COMMAND] [OPTIONS]
+# PyPI token issues
+# Solution: Regenerate token in PyPI account settings
 
-Commands:
-  status              Show publishing status
-  pypi               Publish to PyPI
-  pypi --test        Publish to TestPyPI
-  github             Create GitHub release
-  package-managers   Update package manager configs
-  all                Publish to all channels
+# TestPyPI upload conflicts  
+# Solution: Increment version number or use dev versions
 
-Options:
-  --dry-run          Show what would be published
-  --verbose          Enable verbose output
+# GitHub release conflicts
+# Solution: Delete existing release and retry
 ```
 
-### Step 5: Verification
+### Manual Override Process
 
-After publishing, verify packages are available:
+If automated release fails, manual steps can be used:
+
+#### 1. **Manual Binary Build**
+```bash
+# Build locally for current platform
+poetry run python build/build_binary.py
+
+# Test the binary
+./dist/giv-* --version
+```
+
+#### 2. **Manual PyPI Publishing**
+```bash
+# Build package
+poetry build
+
+# Upload to TestPyPI first
+poetry publish --repository testpypi
+
+# Upload to PyPI
+poetry publish
+```
+
+#### 3. **Manual GitHub Release**  
+```bash
+# Create release using GitHub CLI
+gh release create v1.2.3 dist/* --title "v1.2.3" --notes "Release notes"
+```
+
+### Monitoring and Verification
+
+#### Release Verification Checklist
+
+After a release completes:
+
+- [ ] **GitHub Release**: Check all binaries are attached
+- [ ] **PyPI**: Verify package is available (`pip install giv`)
+- [ ] **TestPyPI**: Confirm test deployment worked
+- [ ] **Checksums**: Validate SHA256 checksums match
+- [ ] **Download Test**: Test binary downloads from GitHub
+- [ ] **Installation Test**: Test package manager installations
+
+#### Package Manager Updates
+
+Package managers update automatically, but verify:
 
 ```bash
-# Test PyPI installation  
-pip install giv
-giv --version
-
-# Test binary download
-curl -L -o giv https://github.com/giv-cli/giv-py/releases/latest/download/giv-linux-x86_64
-chmod +x giv
-./giv --version
-
-# Test Homebrew (when available)
+# Homebrew (may take time to propagate)
 brew install giv-cli/tap/giv
-giv --version
+
+# Scoop
+scoop install giv
+
+# PyPI
+pip install giv
+# PyPI
+pip install giv
 ```
 
 ## Distribution Channels
 
-### Binary Downloads (GitHub Releases)
+The automated release process publishes to multiple distribution channels:
+
+### 1. GitHub Releases (Primary)
+- **Location**: https://github.com/giv-cli/giv-py/releases
+- **Content**: Platform-specific binaries, checksums, source code
+- **Updates**: Automatic on tag creation
+- **Usage**: Direct binary downloads
+
+### 2. PyPI (Python Package Index)
+- **Location**: https://pypi.org/project/giv/
+- **Content**: Python wheel and source distribution
+- **Updates**: Automatic via GitHub Actions
+- **Usage**: `pip install giv`
+
+### 3. TestPyPI (Testing)
+- **Location**: https://test.pypi.org/project/giv/
+- **Content**: Pre-release testing packages
+- **Updates**: Automatic for all releases
+- **Usage**: `pip install -i https://test.pypi.org/simple/ giv`
+
+### 4. Package Managers
+
+#### Homebrew (macOS/Linux)
+- **Location**: https://github.com/giv-cli/homebrew-tap
+- **Content**: Formula for tap-based installation
+- **Updates**: Automatic tap and formula generation
+- **Usage**: `brew install giv-cli/tap/giv`
+
+#### Scoop (Windows)
+- **Location**: https://github.com/giv-cli/scoop-bucket  
+- **Content**: Manifest for bucket-based installation
+- **Updates**: Automatic bucket and manifest generation
+- **Usage**: `scoop bucket add giv-cli https://github.com/giv-cli/scoop-bucket && scoop install giv`
+
+#### Chocolatey (Windows)
+- **Location**: Generated automatically
+- **Content**: Package specification
+- **Updates**: Manual submission to Chocolatey gallery
+- **Usage**: `choco install giv`
+
+## Binary Naming Convention
+
+All binaries follow a consistent naming pattern:
+
+```
+giv-{platform}-{arch}[.exe]
+
+Examples:
+- giv-linux-x86_64
+- giv-linux-arm64  
+- giv-macos-x86_64
+- giv-macos-arm64
+- giv-windows-x86_64.exe
+```
+
+This naming ensures clear platform identification and prevents conflicts.
+
+## Version Management
+
+### Semantic Versioning
+The project follows semantic versioning (SemVer):
+- **Major**: Breaking changes (v2.0.0)
+- **Minor**: New features (v1.1.0)  
+- **Patch**: Bug fixes (v1.0.1)
+
+### Release Types
+- **Stable releases**: Tagged versions (v1.2.3)
+- **Pre-releases**: Beta/RC versions (v1.2.3-beta.1)
+- **Development**: Commit-based versions (automated)
+
+The version is automatically extracted from Git tags and updated across all distribution channels.
 - **Build**: PyInstaller creates platform-specific binaries
 - **Validation**: Tests binary execution and core functionality
 - **Publish**: Uploaded to GitHub releases as attachments
@@ -409,50 +647,138 @@ build/
 │   ├── build.py
 │   └── publish.py
 │
-├── homebrew/                         # Homebrew formula
-│   ├── build.py
-│   ├── giv.rb
-│   └── giv.local.rb
-│
-├── scoop/                            # Scoop manifest
-│   ├── build.py
-│   └── giv.json
-│
-└── [other package managers...]
+## GitHub Actions Integration
 
-dist/                                 # Built artifacts
-├── giv-linux-x86_64                 # Platform binaries
-├── giv-darwin-arm64
-├── giv-windows-x86_64.exe
-└── packages/                         # Package manager files
+All build and publishing is handled through GitHub Actions workflows:
+
+### Workflow Configuration
+
+The release process is triggered by git tags:
+
+```yaml
+# .github/workflows/release.yml
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-binaries:
+    uses: ./.github/workflows/build-binaries.yml
+    
+  create-release:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+          generate_release_notes: true
+          
+  publish-pypi:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
 ```
 
-**Key Features:**
-- **Python-native**: All scripts written in Python
-- **Modular design**: Separate modules for each component
-- **Cross-platform**: Builds on native platforms or GitHub Actions
-- **Binary-focused**: Primary distribution via compiled binaries
+### Build Matrix
+
+Cross-platform builds using matrix strategy:
+
+```yaml
+strategy:
+  matrix:
+    include:
+      - platform: linux
+        arch: x86_64
+        runner: ubuntu-latest
+      - platform: linux
+        arch: arm64
+        runner: ubuntu-latest
+      - platform: macos
+        arch: x86_64
+        runner: macos-13
+      - platform: macos
+        arch: arm64
+        runner: macos-latest
+      - platform: windows
+        arch: x86_64
+        runner: windows-latest
+```
+
+## Directory Structure
+
+The build system is organized for maintainability:
+
+```
+build/
+├── build_binary.py                   # Core binary builder
+├── README.md                         # Build documentation
+├── core/                             # Core utilities
+│   ├── config.py                     # Build configuration
+│   ├── utils.py                      # Helper functions
+│   └── version_manager.py            # Version management
+├── homebrew/                         # Homebrew formula generation
+│   ├── build.py                      # Formula builder
+│   └── giv.rb                        # Formula template
+├── scoop/                            # Scoop manifest generation
+│   ├── build.py                      # Manifest builder
+│   └── giv.json                      # Manifest template
+├── pypi/                             # PyPI package building
+│   ├── build.py                      # Package builder
+│   └── setup.py                      # Setup configuration
+└── [other package managers...]
+
+.github/workflows/                    # GitHub Actions
+├── build.yml                         # Main build workflow
+├── build-ci.yml                      # CI-focused builds
+├── build-binaries.yml                # Binary compilation
+└── release.yml                       # Release automation
+```
 
 ## Best Practices
 
-1. **Test binaries before publishing**: Use `--test` flags to validate functionality
-2. **Use dry-run mode**: Test publishing with `--dry-run` flag first
-3. **Use semantic versioning**: Follow semver for version numbers  
-4. **Keep authentication secure**: Use environment variables for tokens/passwords
-5. **Cross-platform testing**: Use GitHub Actions for multi-platform validation
-6. **Document changes**: Update changelogs and release notes
-7. **Monitor package repositories**: Verify successful publication
-8. **Automate builds**: Use GitHub Actions for consistent cross-platform builds
-9. **Check dependencies**: Run `poetry install` to ensure all tools are available
-10. **Version control**: Tag releases and maintain clean git history
+### For Development
+1. **Local testing**: Build and test binaries locally before pushing
+2. **Incremental versions**: Use proper semantic versioning
+3. **Clean workspace**: Ensure no uncommitted changes before tagging
+4. **Test automation**: Run full test suite before releases
 
-## Support
+### For Releases  
+1. **Tag format**: Use `v1.2.3` format for version tags
+2. **Release notes**: GitHub generates automatic release notes
+3. **Validation**: Monitor GitHub Actions for build success
+4. **Distribution**: Verify all distribution channels receive updates
 
-For build system issues:
-- Check build system status: `./build/build.py status`
-- Review Poetry dependencies: `poetry check`
-- Verify platform support: `python build/core/platform_detector.py`
-- Check authentication environment variables are set
-- Test individual components with `--test` or `--dry-run` flags
-- Review GitHub Actions logs for automated builds
-- Consult package manager documentation for publishing issues
+### For Troubleshooting
+1. **GitHub Actions logs**: Primary source for build issues
+2. **Local reproduction**: Use `poetry run python build/build_binary.py` to debug
+3. **Platform testing**: Test binaries on target platforms
+4. **Package verification**: Test installations from published packages
+
+## Support and Maintenance
+
+### Monitoring Release Health
+- **GitHub Actions**: Monitor workflow success rates
+- **Package repositories**: Check PyPI download statistics
+- **User feedback**: Track issues and feature requests
+- **Binary validation**: Automated testing in CI
+
+### Common Maintenance Tasks
+- **Dependencies**: Regular Poetry dependency updates
+- **Security**: Automated security scanning in CI
+- **Platform support**: Adding new platforms as needed
+- **Package managers**: Maintaining formulas and manifests
+
+### Getting Help
+- **Build issues**: Check GitHub Actions workflow logs
+- **Local problems**: Use `poetry install` and `poetry run pytest`
+- **Distribution issues**: Verify repository secrets and permissions
+- **Documentation**: Reference this guide and build/ README files
+
+The automated system ensures consistent, reliable releases while minimizing manual intervention and potential errors.
