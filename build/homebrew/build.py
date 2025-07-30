@@ -50,7 +50,7 @@ class HomebrewBuilder:
         if output_dir is None:
             output_dir = self.config.dist_dir
             
-        print(f"🔨 Building Homebrew formula for version {version}")
+        print(f"Building Homebrew formula for version {version}")
         
         ensure_dir(output_dir)
         
@@ -88,7 +88,7 @@ class HomebrewBuilder:
         with open(formula_path, 'w') as f:
             f.write(formula_content)
         
-        print(f"📦 Homebrew formula: {formula_path.name}")
+        print(f"Package: Homebrew formula: {formula_path.name}")
         return formula_path
     
     def validate_formula(self, formula_path: Path) -> bool:
@@ -101,22 +101,22 @@ class HomebrewBuilder:
         Returns:
             True if formula is valid
         """
-        print("🔍 Validating Homebrew formula...")
+        print("Validating Validating Homebrew formula...")
         
         try:
             cmd = ["brew", "style", str(formula_path)]
             subprocess.run(cmd, check=True, capture_output=True, text=True)
-            print("✅ Homebrew formula syntax is valid")
+            print("SUCCESS: Homebrew formula syntax is valid")
             return True
         except subprocess.CalledProcessError as e:
-            print(f"❌ Homebrew formula validation failed: {e}")
+            print(f"ERROR: Homebrew formula validation failed: {e}")
             if e.stdout:
                 print("STDOUT:", e.stdout)
             if e.stderr:
                 print("STDERR:", e.stderr)
             return False
         except FileNotFoundError:
-            print("⚠️  brew command not found, skipping validation")
+            print("WARNING:  brew command not found, skipping validation")
             return True
 
 
@@ -150,19 +150,19 @@ def main():
         formula_path = builder.build_formula(args.version, args.output_dir)
         
         if not formula_path.exists():
-            print("❌ No formula was built")
+            print("ERROR: No formula was built")
             sys.exit(1)
         
         # Validate formula (optional)
         try:
             builder.validate_formula(formula_path)
         except Exception as e:
-            print(f"⚠️  Formula validation skipped: {e}")
+            print(f"WARNING:  Formula validation skipped: {e}")
         
-        print("✅ Homebrew formula build completed successfully")
+        print("SUCCESS: Homebrew formula build completed successfully")
         
     except Exception as e:
-        print(f"❌ Homebrew formula build failed: {e}")
+        print(f"ERROR: Homebrew formula build failed: {e}")
         sys.exit(1)
 
 

@@ -41,7 +41,7 @@ def build_binary():
     dist_dir.mkdir(exist_ok=True)
     
     binary_name = get_binary_name()
-    print(f"🔨 Building {binary_name}...")
+    print(f"Building {binary_name}...")
     
     # Minimal PyInstaller command - let it auto-detect what it can
     cmd = [
@@ -56,10 +56,10 @@ def build_binary():
     
     try:
         subprocess.run(cmd, check=True, cwd=project_root)
-        print(f"✅ Binary built: {dist_dir / binary_name}")
+        print(f"Binary built successfully: {dist_dir / binary_name}")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed: {e.returncode}")
+        print(f"Build failed with exit code: {e.returncode}")
         return False
 
 

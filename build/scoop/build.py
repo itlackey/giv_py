@@ -50,7 +50,7 @@ class ScoopBuilder:
         if output_dir is None:
             output_dir = self.config.dist_dir
             
-        print(f"🔨 Building Scoop manifest for version {version}")
+        print(f"Building Scoop manifest for version {version}")
         
         ensure_dir(output_dir)
         
@@ -88,7 +88,7 @@ class ScoopBuilder:
         with open(manifest_path, 'w') as f:
             json.dump(manifest, f, indent=4)
         
-        print(f"📦 Scoop manifest: {manifest_path.name}")
+        print(f"Package: Scoop manifest: {manifest_path.name}")
         return manifest_path
     
     def validate_manifest(self, manifest_path: Path) -> bool:
@@ -101,7 +101,7 @@ class ScoopBuilder:
         Returns:
             True if manifest is valid
         """
-        print("🔍 Validating Scoop manifest...")
+        print("Validating Validating Scoop manifest...")
         
         try:
             with open(manifest_path, 'r') as f:
@@ -111,16 +111,16 @@ class ScoopBuilder:
             required_fields = ["version", "url", "hash", "bin"]
             for field in required_fields:
                 if field not in manifest:
-                    print(f"❌ Missing required field: {field}")
+                    print(f"ERROR: Missing required field: {field}")
                     return False
             
-            print("✅ Scoop manifest is valid")
+            print("SUCCESS: Scoop manifest is valid")
             return True
         except json.JSONDecodeError as e:
-            print(f"❌ Invalid JSON in manifest: {e}")
+            print(f"ERROR: Invalid JSON in manifest: {e}")
             return False
         except Exception as e:
-            print(f"❌ Manifest validation failed: {e}")
+            print(f"ERROR: Manifest validation failed: {e}")
             return False
 
 
@@ -154,19 +154,19 @@ def main():
         manifest_path = builder.build_manifest(args.version, args.output_dir)
         
         if not manifest_path.exists():
-            print("❌ No manifest was built")
+            print("ERROR: No manifest was built")
             sys.exit(1)
         
         # Validate manifest
         try:
             builder.validate_manifest(manifest_path)
         except Exception as e:
-            print(f"⚠️  Manifest validation skipped: {e}")
+            print(f"WARNING:  Manifest validation skipped: {e}")
         
-        print("✅ Scoop manifest build completed successfully")
+        print("SUCCESS: Scoop manifest build completed successfully")
         
     except Exception as e:
-        print(f"❌ Scoop manifest build failed: {e}")
+        print(f"ERROR: Scoop manifest build failed: {e}")
         sys.exit(1)
 
 
