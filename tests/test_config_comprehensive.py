@@ -8,8 +8,8 @@ Tests configuration management functionality including:
 - Compatibility with Bash implementation
 """
 import os
-import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 from giv.config import ConfigManager
 
@@ -19,32 +19,20 @@ class TestConfigManager:
     
     def test_init_with_default_path(self, temp_dir):
         """Test ConfigManager initialization with default path."""
-        # Mock home directory and change to temp dir to avoid project-level config
-        old_home = os.environ.get("HOME")
-        old_userprofile = os.environ.get("USERPROFILE")
         old_cwd = os.getcwd()
-        
-        # Set both HOME and USERPROFILE for cross-platform compatibility
-        os.environ["HOME"] = str(temp_dir)
-        os.environ["USERPROFILE"] = str(temp_dir)
         os.chdir(temp_dir)
         
-        try:
-            cfg = ConfigManager()
-            # Should look for config in ~/.giv/config
-            expected_path = temp_dir / ".giv" / "config"
-            # Use resolved paths for Windows compatibility
-            assert cfg.config_path.resolve() == expected_path.resolve()
-        finally:
-            os.chdir(old_cwd)
-            if old_home:
-                os.environ["HOME"] = old_home
-            else:
-                os.environ.pop("HOME", None)
-            if old_userprofile:
-                os.environ["USERPROFILE"] = old_userprofile
-            else:
-                os.environ.pop("USERPROFILE", None)
+        # Use multiple mocking strategies for cross-platform compatibility
+        with patch.dict(os.environ, {'HOME': str(temp_dir), 'USERPROFILE': str(temp_dir)}, clear=False), \
+             patch('giv.config.Path.home', return_value=temp_dir):
+            try:
+                cfg = ConfigManager()
+                # Should look for config in ~/.giv/config
+                expected_path = temp_dir / ".giv" / "config"
+                # Use resolved paths for Windows compatibility
+                assert cfg.config_path.resolve() == expected_path.resolve()
+            finally:
+                os.chdir(old_cwd)
     
     def test_init_with_custom_path(self, temp_dir):
         """Test ConfigManager initialization with custom path."""
