@@ -275,5 +275,3 @@ jobs:
         body: ${{ steps.release_notes.outputs.release_notes }}
         draft: false
         prerelease: ${{ contains(github.ref, '-') }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
