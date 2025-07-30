@@ -40,7 +40,7 @@ jobs:
       uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
@@ -48,7 +48,7 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3.11-dev
+        sudo apt-get install -y python3-dev build-essential
     
     - name: Install Poetry
       uses: snok/install-poetry@v1
