@@ -11,10 +11,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
-from typing import Any, Dict
 
 from . import __version__
 from .config import ConfigManager
@@ -38,6 +36,11 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     """Add common arguments that can appear after subcommands."""
     # Note: --verbose, --dry-run, --output-mode, --output-file are defined globally
     # to avoid argparse conflicts. This means they must come before the subcommand.
+    # Common arguments include:
+    # - `--verbose`: Enable debug/trace output
+    # - `--dry-run`: Preview only; don't write any files
+    # - `--output-mode`: Specify output mode (auto, append, prepend, etc.)
+    # - `--output-file`: Specify file to write output to
     pass
 
 

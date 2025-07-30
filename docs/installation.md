@@ -93,6 +93,28 @@ curl -fsSL https://raw.githubusercontent.com/giv-cli/giv-py/main/install-rpm.sh 
 sudo dnf install giv  # or yum install giv
 ```
 
+## PyPI Installation
+
+To install `giv` via PyPI, ensure you have Python 3.8.1 or later installed. Run the following command:
+
+```bash
+pip install giv
+```
+
+After installation, verify the installation:
+
+```bash
+giv --version
+```
+
+Initialize `giv` in your project:
+
+```bash
+giv init
+```
+
+This will create a `.giv/config` file and prompt you for configuration values like API keys and project settings.
+
 ## After Installation
 
 Verify the installation:

@@ -7,11 +7,9 @@ command definitions in :mod:`giv.cli`.
 """
 from __future__ import annotations
 
-import argparse
 import logging
 import sys
 
-from . import __version__
 from .cli import build_parser, run_command
 
 logger = logging.getLogger(__name__)
@@ -72,6 +70,9 @@ def _preprocess_args(argv: list[str]) -> list[str]:
                 # Only 2 args: config, key -> get operation  
                 return argv[:config_pos] + ["config", "--get", operation]
     
+    # Edge case: Handle empty arguments or unexpected input
+    # Example: argv = [] should return [] without processing
+    # Example: argv = ['config'] should default to ['config', '--list']
     return argv
 
 
