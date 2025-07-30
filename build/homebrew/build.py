@@ -61,9 +61,9 @@ class HomebrewBuilder:
         with open(self.template_file, 'r') as f:
             template = f.read()
         
-        # Find binary files and calculate checksums
-        binary_path = output_dir / "giv-macos-x86_64"
-        arm_binary_path = output_dir / "giv-macos-arm64"
+        # Find binary files and calculate checksums - always look in main dist directory
+        binary_path = self.config.dist_dir / "giv-macos-x86_64"
+        arm_binary_path = self.config.dist_dir / "giv-macos-arm64"
         
         variables = {
             "VERSION": version,

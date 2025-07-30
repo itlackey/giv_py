@@ -54,8 +54,9 @@ class ScoopBuilder:
         
         ensure_dir(output_dir)
         
-        # Find Windows binary
-        binary_path = output_dir / "giv-windows-x86_64.exe"
+        # Find Windows binary - always look in the main dist directory
+        # regardless of where we're placing the manifest
+        binary_path = self.config.dist_dir / "giv-windows-x86_64.exe"
         
         if not binary_path.exists():
             raise FileNotFoundError(f"Windows binary not found: {binary_path}")
