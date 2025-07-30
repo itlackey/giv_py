@@ -60,9 +60,9 @@ jobs:
         fi
     
     - name: Install Poetry
-      uses: snok/install-poetry@v1
+      uses: snok/install-poetry@v1.4.1
       with:
-        version: 'latest'
+        version: latest
         virtualenvs-create: true
         virtualenvs-in-project: true
 
@@ -121,10 +121,20 @@ jobs:
       shell: bash
       run: |
         cd dist
-        if [[ "${{ matrix.platform }}" == "windows" ]]; then
-          sha256sum "giv-${{ matrix.target }}.exe" > "giv-${{ matrix.target }}.exe.sha256"
+        # Use cross-platform checksum command
+        if command -v sha256sum >/dev/null 2>&1; then
+          CHECKSUM_CMD="sha256sum"
+        elif command -v shasum >/dev/null 2>&1; then
+          CHECKSUM_CMD="shasum -a 256"
         else
-          sha256sum "giv-${{ matrix.target }}" > "giv-${{ matrix.target }}.sha256"
+          echo "Error: No checksum command available"
+          exit 1
+        fi
+        
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          $CHECKSUM_CMD "giv-${{ matrix.target }}.exe" > "giv-${{ matrix.target }}.exe.sha256"
+        else
+          $CHECKSUM_CMD "giv-${{ matrix.target }}" > "giv-${{ matrix.target }}.sha256"
         fi
     
     - name: Upload binary

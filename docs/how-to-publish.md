@@ -209,7 +209,12 @@ binary_name: giv-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.platform ==
 - name: Generate checksums
   run: |
     cd dist/
-    sha256sum * > checksums.sha256
+    # Use cross-platform checksum command
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum * > checksums.sha256
+    else
+      shasum -a 256 * > checksums.sha256
+    fi
 ```
 
 ## Build System Architecture
