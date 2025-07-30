@@ -1,5 +1,7 @@
 name: Build Binaries
-
+permissions:
+  contents: write
+  packages: write
 on:
   workflow_call:
   push:
