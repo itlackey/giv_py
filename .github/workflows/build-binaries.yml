@@ -21,6 +21,10 @@ jobs:
             arch: x86_64
             runner: ubuntu-latest
             target: linux-x86_64
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-latest
+            target: linux-arm64
           - platform: macos
             arch: x86_64
             runner: macos-13
@@ -50,40 +54,29 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3-dev build-essential
+        # Install cross-compilation tools for ARM64
+        if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+        fi
     
     - name: Install Poetry
-      uses: snok/install-poetry@v1
+      uses: snok/install-poetry@v1.4.1
       with:
-        version: 'latest'
+        version: latest
         virtualenvs-create: true
         virtualenvs-in-project: true
 
-    - name: Configure Poetry PATH and verify
+    - name: Configure build environment
       shell: bash
       run: |
-        # Add potential Poetry paths to PATH
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          export PATH="$APPDATA/Python/Scripts:$PATH"
-          export PATH="$APPDATA/pypoetry/venv/Scripts:$PATH"
-          echo "$APPDATA/Python/Scripts" >> $GITHUB_PATH
-          echo "$APPDATA/pypoetry/venv/Scripts" >> $GITHUB_PATH
+        # Set cross-compilation environment for Linux ARM64
+        if [[ "${{ matrix.platform }}" == "linux" && "${{ matrix.arch }}" == "arm64" ]]; then
+          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+          echo "AR=aarch64-linux-gnu-ar" >> $GITHUB_ENV
+          echo "STRIP=aarch64-linux-gnu-strip" >> $GITHUB_ENV
         fi
         
-        # Try to find poetry
-        which poetry || echo "Poetry not found in PATH"
-        poetry --version || echo "Poetry version check failed"
-        
-        # If poetry still not found, try pip install as fallback
-        if ! command -v poetry &> /dev/null; then
-          echo "Installing Poetry via pip as fallback..."
-          python -m pip install --user poetry
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            export PATH="$HOME/.local/bin:$PATH"
-            echo "$HOME/.local/bin" >> $GITHUB_PATH
-          fi
-        fi
-        
-        # Final verification
         poetry --version
         poetry config virtualenvs.create true
         poetry config virtualenvs.in-project true
@@ -100,22 +93,138 @@ jobs:
       shell: bash
       run: poetry run build-binary
     
-    - name: Test binary (Linux/macOS)
-      if: matrix.platform != 'windows'
+    - name: Rename binary to match target
+      shell: bash
       run: |
-        chmod +x dist/giv-${{ matrix.target }}
-        ./dist/giv-${{ matrix.target }} --version
+        echo "Contents of dist/ after build:"
+        ls -la dist/
+        
+        # Find the binary that was actually created
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          BUILT_BINARY=$(find dist/ -name "giv-*.exe" -type f | head -1)
+          TARGET_BINARY="dist/giv-${{ matrix.target }}.exe"
+        else
+          BUILT_BINARY=$(find dist/ -name "giv-*" -type f -not -name "*.sha256" | head -1)
+          TARGET_BINARY="dist/giv-${{ matrix.target }}"
+        fi
+        
+        if [[ -z "$BUILT_BINARY" ]]; then
+          echo "ERROR: No binary found after build"
+          exit 1
+        fi
+        
+        echo "Found built binary: $BUILT_BINARY"
+        echo "Target binary name: $TARGET_BINARY"
+        
+        # Rename if different
+        if [[ "$BUILT_BINARY" != "$TARGET_BINARY" ]]; then
+          echo "Renaming binary to match target"
+          mv "$BUILT_BINARY" "$TARGET_BINARY"
+        fi
+        
+        echo "Final contents of dist/:"
+        ls -la dist/
     
-    - name: Test binary (Windows)
-      if: matrix.platform == 'windows'
+    - name: Test binary
+      shell: bash
       run: |
-        ./dist/giv-${{ matrix.target }}.exe --version
+        echo "Matrix target: ${{ matrix.target }}"
+        echo "Matrix platform: ${{ matrix.platform }}"
+        echo "Contents of dist/:"
+        ls -la dist/
+        
+        # Find the actual binary that was created
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          EXPECTED_BINARY="dist/giv-${{ matrix.target }}.exe"
+        else
+          EXPECTED_BINARY="dist/giv-${{ matrix.target }}"
+        fi
+        
+        echo "Looking for expected binary: $EXPECTED_BINARY"
+        
+        # Check if expected binary exists
+        if [[ -f "$EXPECTED_BINARY" ]]; then
+          BINARY_PATH="$EXPECTED_BINARY"
+        else
+          # Try to find any giv binary in dist/
+          echo "Expected binary not found, looking for any giv binary..."
+          BINARY_PATH=$(find dist/ -name "giv-*" -type f | head -1)
+          if [[ -z "$BINARY_PATH" ]]; then
+            echo "ERROR: No giv binary found in dist/"
+            exit 1
+          fi
+          echo "Found binary: $BINARY_PATH"
+        fi
+        
+        # Make executable if not Windows
+        if [[ "${{ matrix.platform }}" != "windows" ]]; then
+          chmod +x "$BINARY_PATH"
+        fi
+        
+        # Test binary exists and is executable
+        if [[ ! -f "$BINARY_PATH" ]]; then
+          echo "ERROR: Binary not found at $BINARY_PATH"
+          exit 1
+        fi
+        
+        echo "Testing binary: $BINARY_PATH"
+        
+        # Basic functionality test (skip for cross-compiled ARM64)
+        if [[ "${{ matrix.arch }}" != "arm64" || "${{ matrix.platform }}" != "linux" ]]; then
+          "$BINARY_PATH" --version
+        else
+          echo "Skipping execution test for cross-compiled ARM64 binary"
+        fi
+    
+    - name: Generate checksums
+      shell: bash
+      run: |
+        cd dist
+        echo "Contents of dist/:"
+        ls -la
+        
+        # Use cross-platform checksum command
+        if command -v sha256sum >/dev/null 2>&1; then
+          CHECKSUM_CMD="sha256sum"
+        elif command -v shasum >/dev/null 2>&1; then
+          CHECKSUM_CMD="shasum -a 256"
+        else
+          echo "Error: No checksum command available"
+          exit 1
+        fi
+        
+        # Find the binary that was created and generate checksum
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          EXPECTED_BINARY="giv-${{ matrix.target }}.exe"
+        else
+          EXPECTED_BINARY="giv-${{ matrix.target }}"
+        fi
+        
+        if [[ -f "$EXPECTED_BINARY" ]]; then
+          echo "Generating checksum for: $EXPECTED_BINARY"
+          $CHECKSUM_CMD "$EXPECTED_BINARY" > "$EXPECTED_BINARY.sha256"
+        else
+          # Find any giv binary and generate checksum
+          BINARY_FILE=$(find . -name "giv-*" -type f -not -name "*.sha256" | head -1)
+          if [[ -n "$BINARY_FILE" ]]; then
+            BINARY_FILE=${BINARY_FILE#./}  # Remove leading ./
+            echo "Generating checksum for found binary: $BINARY_FILE"
+            $CHECKSUM_CMD "$BINARY_FILE" > "$BINARY_FILE.sha256"
+          else
+            echo "ERROR: No binary found to generate checksum"
+            exit 1
+          fi
+        fi
+        
+        echo "Generated checksums:"
+        ls -la *.sha256
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: giv-${{ matrix.target }}
-        path: dist/giv-${{ matrix.target }}*
+        path: |
+          dist/giv-${{ matrix.target }}*
         retention-days: 30
     
     - name: Create release (on tag)

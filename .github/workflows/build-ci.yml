@@ -1,0 +1,114 @@
+name: Build CI Binaries
+
+on:
+  workflow_call:
+    inputs:
+      cache_dependencies:
+        description: 'Use dependency caching (for CI)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: linux
+            arch: x86_64
+            runner: ubuntu-latest
+            target: linux-x86_64
+          - platform: macos
+            arch: x86_64
+            runner: macos-13
+            target: macos-x86_64
+          - platform: windows
+            arch: x86_64
+            runner: windows-latest
+            target: windows-x86_64
+    
+    runs-on: ${{ matrix.runner }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-dev build-essential
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1.4.1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Configure build environment
+      shell: bash
+      run: |
+        poetry --version
+        poetry config virtualenvs.create true
+        poetry config virtualenvs.in-project true
+
+    - name: Load cached venv
+      if: inputs.cache_dependencies
+      id: cached-poetry-dependencies
+      uses: actions/cache@v4
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('**/poetry.lock') }}
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        if [[ "${{ inputs.cache_dependencies }}" == "true" && "${{ steps.cached-poetry-dependencies.outputs.cache-hit }}" == "true" ]]; then
+          echo "Using cached dependencies"
+        fi
+        poetry install --no-interaction --no-ansi
+    
+    - name: Ensure scripts are installed
+      shell: bash
+      run: poetry install --only-root --no-interaction --no-ansi
+
+    - name: Run tests
+      shell: bash
+      run: poetry run pytest -q
+
+    - name: Build binary
+      shell: bash
+      run: poetry run build-binary
+    
+    - name: Test binary
+      shell: bash
+      run: |
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          BINARY_PATH="dist/giv-${{ matrix.target }}.exe"
+        else
+          BINARY_PATH="dist/giv-${{ matrix.target }}"
+          chmod +x "$BINARY_PATH"
+        fi
+        
+        # Test binary exists and is executable
+        if [[ ! -f "$BINARY_PATH" ]]; then
+          echo "ERROR: Binary not found at $BINARY_PATH"
+          ls -la dist/
+          exit 1
+        fi
+        
+        # Basic functionality test
+        "$BINARY_PATH" --version
+
+    - name: Upload test artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: giv-${{ matrix.target }}-ci
+        path: dist/giv-${{ matrix.target }}*
+        retention-days: 7

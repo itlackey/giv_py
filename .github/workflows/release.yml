@@ -15,6 +15,11 @@ on:
         required: false
         type: boolean
         default: true
+      publish_test_pypi:
+        description: 'Publish to Test PyPI'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-binaries:
@@ -22,6 +27,7 @@ jobs:
     
   build-packages:
     runs-on: ubuntu-latest
+    needs: [build-binaries]  # Wait for binaries to be built first
     
     steps:
     - name: Checkout code
@@ -33,9 +39,9 @@ jobs:
         python-version: '3.11'
     
     - name: Install Poetry
-      uses: snok/install-poetry@v1
+      uses: snok/install-poetry@v1.4.1
       with:
-        version: 'latest'
+        version: latest
         virtualenvs-create: true
         virtualenvs-in-project: true
     
@@ -53,12 +59,17 @@ jobs:
         retention-days: 30
     
     - name: Publish to Test PyPI
-      if: contains(github.ref, '-') || github.event_name == 'workflow_dispatch'
+      if: contains(github.ref, '-') || github.event_name == 'workflow_dispatch' && github.event.inputs.publish_test_pypi == 'true'
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
       run: |
-        poetry publish --repository testpypi
+        if [[ -n "$TWINE_PASSWORD" ]]; then
+          poetry config repositories.testpypi https://test.pypi.org/legacy/
+          poetry publish --repository testpypi
+        else
+          echo "WARNING: TEST_PYPI_API_TOKEN not found, skipping Test PyPI publish"
+        fi
     
     - name: Publish to PyPI
       if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') && (github.event.inputs.publish_pypi == 'true' || github.event.inputs.publish_pypi == '')
@@ -66,7 +77,11 @@ jobs:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        poetry publish
+        if [[ -n "$TWINE_PASSWORD" ]]; then
+          poetry publish
+        else
+          echo "WARNING: PYPI_API_TOKEN not found, skipping PyPI publish"
+        fi
   
   generate-package-configs:
     runs-on: ubuntu-latest
@@ -82,9 +97,9 @@ jobs:
         python-version: '3.11'
     
     - name: Install Poetry
-      uses: snok/install-poetry@v1
+      uses: snok/install-poetry@v1.4.1
       with:
-        version: 'latest'
+        version: latest
         virtualenvs-create: true
         virtualenvs-in-project: true
     
@@ -105,19 +120,58 @@ jobs:
           VERSION="${{ github.event.inputs.version }}"
         fi
         
-        mkdir -p dist/$VERSION
+        echo "Organizing artifacts for version: $VERSION"
+        echo "Downloaded artifacts:"
+        ls -la artifacts/
         
-        # Copy binaries to expected locations
+        # Create dist directory for binaries (what build scripts expect)
+        mkdir -p dist
+        
+        # Copy binaries to dist/ directory (flat structure expected by build scripts)
+        for artifact_dir in artifacts/giv-*; do
+          if [[ -d "$artifact_dir" ]]; then
+            echo "Processing artifact directory: $artifact_dir"
+            ls -la "$artifact_dir/"
+            
+            # Copy all files from artifact directory to dist/
+            cp "$artifact_dir"/* dist/
+          fi
+        done
+        
+        echo "Final dist/ contents:"
+        ls -la dist/
+        
+        # Also create versioned directory structure for release assets
+        mkdir -p "dist/$VERSION"
+        
+        # Copy binaries to versioned structure as well
         for artifact_dir in artifacts/giv-*; do
           if [[ -d "$artifact_dir" ]]; then
             target=$(basename "$artifact_dir" | sed 's/^giv-//')
-            platform=$(echo "$target" | cut -d'-' -f1)
-            arch=$(echo "$target" | cut -d'-' -f2)
+            
+            # Handle platform naming consistency for release organization
+            case "$target" in
+              "macos-x86_64")
+                platform="darwin"
+                arch="x86_64"
+                ;;
+              "macos-arm64")
+                platform="darwin"  
+                arch="arm64"
+                ;;
+              *)
+                platform=$(echo "$target" | cut -d'-' -f1)
+                arch=$(echo "$target" | cut -d'-' -f2)
+                ;;
+            esac
             
             mkdir -p "dist/$VERSION/$platform-$arch"
             cp "$artifact_dir"/* "dist/$VERSION/$platform-$arch/"
           fi
         done
+        
+        # Generate consolidated checksums file
+        find dist/$VERSION -name "*.sha256" -exec cat {} \; > "dist/$VERSION/checksums.txt"
     
     - name: Generate Homebrew formula
       run: |
@@ -145,6 +199,7 @@ jobs:
           dist/*/homebrew-tap/**/*
           dist/*/scoop-bucket/**/*
           dist/*/chocolatey/**/*
+          dist/*/checksums.txt
         draft: false
         prerelease: ${{ contains(github.ref, '-') }}
       env:
@@ -176,8 +231,8 @@ jobs:
         
         - **Linux x86_64**: [giv-linux-x86_64](https://github.com/giv-cli/giv-py/releases/download/v${VERSION}/giv-linux-x86_64)
         - **Linux ARM64**: [giv-linux-arm64](https://github.com/giv-cli/giv-py/releases/download/v${VERSION}/giv-linux-arm64)
-        - **macOS Intel**: [giv-darwin-x86_64](https://github.com/giv-cli/giv-py/releases/download/v${VERSION}/giv-darwin-x86_64)
-        - **macOS Apple Silicon**: [giv-darwin-arm64](https://github.com/giv-cli/giv-py/releases/download/v${VERSION}/giv-darwin-arm64)
+        - **macOS Intel**: [giv-macos-x86_64](https://github.com/giv-cli/giv-py/releases/download/v${VERSION}/giv-macos-x86_64)
+        - **macOS Apple Silicon**: [giv-macos-arm64](https://github.com/giv-cli/giv-py/releases/download/v${VERSION}/giv-macos-arm64)
         - **Windows**: [giv-windows-x86_64.exe](https://github.com/giv-cli/giv-py/releases/download/v${VERSION}/giv-windows-x86_64.exe)
         
         ### Package Managers

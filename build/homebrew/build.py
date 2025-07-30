@@ -6,7 +6,7 @@ Generates Homebrew formulas that reference binary releases.
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 # Handle imports for both standalone and package usage
 try:
@@ -61,9 +61,9 @@ class HomebrewBuilder:
         with open(self.template_file, 'r') as f:
             template = f.read()
         
-        # Find binary files and calculate checksums
-        binary_path = output_dir / "giv-macos-x86_64"
-        arm_binary_path = output_dir / "giv-macos-arm64"
+        # Find binary files and calculate checksums - always look in main dist directory
+        binary_path = self.config.dist_dir / "giv-macos-x86_64"
+        arm_binary_path = self.config.dist_dir / "giv-macos-arm64"
         
         variables = {
             "VERSION": version,
@@ -119,6 +119,56 @@ class HomebrewBuilder:
             print("WARNING:  brew command not found, skipping validation")
             return True
 
+    def create_tap_structure(self, version: Optional[str] = None, output_dir: Optional[Path] = None) -> Path:
+        """
+        Create Homebrew tap directory structure.
+        
+        Args:
+            version: Version string (auto-detected if not provided)
+            output_dir: Output directory (defaults to dist/)
+            
+        Returns:
+            Path to tap directory
+        """
+        if version is None:
+            version = self.version_manager.get_build_version()
+        
+        if output_dir is None:
+            output_dir = self.config.dist_dir / version
+        
+        # Create tap structure: homebrew-tap/Formula/
+        tap_dir = output_dir / "homebrew-tap"
+        formula_dir = tap_dir / "Formula"
+        ensure_dir(formula_dir)
+        
+        # Build and place formula in tap structure
+        formula_path = self.build_formula(version, formula_dir)
+        
+        # Create README for tap
+        readme_content = f"""# Homebrew Tap for giv CLI
+
+This is the official Homebrew tap for giv CLI version {version}.
+
+## Installation
+
+```bash
+brew tap giv-cli/tap
+brew install giv
+```
+
+## Updating
+
+```bash
+brew update
+brew upgrade giv
+```
+"""
+        readme_path = tap_dir / "README.md"
+        readme_path.write_text(readme_content)
+        
+        print(f"Created Homebrew tap structure at: {tap_dir}")
+        return tap_dir
+
 
 def main():
     """CLI interface for Homebrew builder."""
@@ -128,11 +178,18 @@ def main():
     parser.add_argument("--version", help="Version to build (auto-detected if not provided)")
     parser.add_argument("--output-dir", type=Path, help="Output directory for formula")
     parser.add_argument("--validate", action="store_true", help="Validate formula only")
+    parser.add_argument("--create-tap", action="store_true", help="Create Homebrew tap structure")
     
     args = parser.parse_args()
     
     try:
         builder = HomebrewBuilder()
+        
+        if args.create_tap:
+            # Create Homebrew tap structure
+            tap_dir = builder.create_tap_structure(args.version, args.output_dir)
+            print(f"SUCCESS: Homebrew tap created at {tap_dir}")
+            return
         
         if args.validate:
             # Find existing formula to validate

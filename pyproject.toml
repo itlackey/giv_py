@@ -5,9 +5,9 @@ description = "Intelligent Git commit message and changelog generator powered by
 authors = ["giv Development Team <giv@example.com>"]
 readme = "README.md"
 license = "MIT"
-homepage = "https://github.com/yourusername/giv-cli"
-repository = "https://github.com/yourusername/giv-cli"
-documentation = "https://github.com/yourusername/giv-cli/blob/main/README.md"
+homepage = "https://github.com/giv-cli/giv-py"
+repository = "https://github.com/giv-cli/giv-py"
+documentation = "https://github.com/giv-cli/giv-py/blob/main/README.md"
 keywords = ["git", "commit", "ai", "changelog", "cli", "llm", "openai"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -50,6 +50,11 @@ pyinstaller = "^6.14.2"
 [tool.poetry.scripts]
 giv = "giv.main:main"
 build-binary = "build.build_binary:main"
+
+[[tool.poetry.source]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

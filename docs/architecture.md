@@ -2,26 +2,27 @@
 
 ## Overview
 
-giv is a Python-based CLI tool compiled into standalone binaries for cross-platform distribution. The tool maintains the same command-line interface as the original Bash implementation while providing improved performance, reliability, and cross-platform compatibility.
+giv is a Python-based CLI tool compiled into standalone binaries for cross-platform distribution using GitHub Actions automation. The tool provides an intelligent Git history assistant with AI-powered commit message generation, changelog creation, and release note automation.
 
 ## Binary Distribution Architecture
 
-The tool is distributed as self-contained executables built using PyInstaller:
+The tool is distributed as self-contained executables built using PyInstaller via GitHub Actions:
 
 - **Single binary**: All dependencies bundled into one executable
 - **No runtime dependencies**: Python runtime and all libraries included
 - **Cross-platform**: Separate binaries for Linux, macOS, and Windows
 - **Architecture support**: x86_64 and ARM64 for Linux/macOS
+- **Automated builds**: GitHub Actions matrix builds for all platforms
 
 ### Supported Platforms
 
-| Platform | Architecture | Binary Name |
-|----------|-------------|-------------|
-| Linux | x86_64 | `giv-linux-x86_64` |
-| Linux | ARM64 | `giv-linux-arm64` |
-| macOS | x86_64 (Intel) | `giv-darwin-x86_64` |
-| macOS | ARM64 (Apple Silicon) | `giv-darwin-arm64` |
-| Windows | x86_64 | `giv-windows-x86_64.exe` |
+| Platform | Architecture | Binary Name | Build Method |
+|----------|-------------|-------------|--------------|
+| Linux | x86_64 | `giv-linux-x86_64` | Native build |
+| Linux | ARM64 | `giv-linux-arm64` | Cross-compilation |
+| macOS | x86_64 (Intel) | `giv-macos-x86_64` | Native build |
+| macOS | ARM64 (Apple Silicon) | `giv-macos-arm64` | Native build |
+| Windows | x86_64 | `giv-windows-x86_64.exe` | Native build |
 
 ## Python Implementation Architecture
 
@@ -30,31 +31,49 @@ The Python implementation follows a modular architecture with clear separation o
 ### Core Components
 
 - **CLI Layer** (`giv/cli.py`): Argument parsing and command dispatch
-- **Configuration** (`giv/config.py`): Git-style configuration management
-- **Git Integration** (`giv/git_utils.py`): Git operations and history extraction
-- **LLM Client** (`giv/llm_utils.py`): AI model integration (local/remote)
-- **Template Engine** (`giv/template_utils.py`): Prompt template processing
-- **Output Management** (`giv/output_utils.py`): File writing with various modes
-- **Project Metadata** (`giv/project_metadata.py`): Version and project information
-- **Markdown Processing** (`giv/markdown_utils.py`): Markdown utilities
+- **Command System** (`giv/commands/`): Individual command implementations inheriting from BaseCommand
+- **Configuration** (`giv/config.py`): Git-style hierarchical configuration management
+- **Git Integration** (`giv/lib/git.py`): Git operations and history extraction
+- **LLM Client** (`giv/lib/llm.py`): AI model integration (local/remote)
+- **Template Engine** (`giv/lib/templates.py`): Prompt template processing with multi-source discovery
+- **Output Management** (`giv/lib/output.py`): File writing with various modes (append/prepend/update)
+- **Metadata Extraction** (`giv/lib/metadata.py`): Project version and information detection
+- **Markdown Processing** (`giv/lib/markdown.py`): Markdown utilities and section management
 
 ### Command Architecture
 
-All subcommands follow a consistent pattern:
-1. Parse arguments and load configuration
-2. Extract Git data (diffs, commits, metadata)
-3. Build prompt from template with context
-4. Generate content using LLM client
-5. Write output using appropriate mode
+All subcommands follow the BaseCommand pattern:
+1. Inherit from `BaseCommand` with consistent constructor pattern
+2. Use `argparse.Namespace` + `ConfigManager` for configuration
+3. Override `customize_context()` to modify template variables
+4. Override `handle_output()` to customize file writing behavior
+5. Auto-discover templates via `template_name` attribute
 
-### Compilation Process
+### Build and Release Architecture
 
-The Python source is compiled using PyInstaller with these optimizations:
+The compilation and distribution process uses GitHub Actions automation:
 
-- **One-file bundle**: Single executable with all dependencies
-- **Static linking**: No external library dependencies
-- **Optimized imports**: Only required modules included
-- **Cross-compilation**: Separate builds for each target platform
+#### GitHub Actions Workflows
+
+1. **`.github/workflows/build.yml`** - Main CI workflow
+   - Multi-Python version testing (3.8-3.12)
+   - Calls `build-ci.yml` for binary validation
+   - Dependency caching for fast feedback
+
+2. **`.github/workflows/build-ci.yml`** - CI binary builds
+   - x86_64 platforms only for speed
+   - Test execution before building
+   - Short artifact retention
+
+3. **`.github/workflows/build-binaries.yml`** - Production builds
+   - Full platform matrix including ARM64
+   - Cross-compilation for Linux ARM64
+   - Checksum generation and validation
+
+4. **`.github/workflows/release.yml`** - Release automation
+   - Automated PyPI publishing (test and production)
+   - Package manager configuration generation
+   - GitHub release creation with all assets
 
 ## Repository Structure
 
@@ -66,106 +85,206 @@ giv_py/
 │   ├── __init__.py               # Package initialization
 │   ├── __main__.py               # Entry point for python -m giv
 │   ├── cli.py                    # CLI argument parsing and dispatch
-│   ├── config.py                 # Configuration management
-│   ├── git_utils.py              # Git operations
-│   ├── llm_utils.py              # LLM client
-│   ├── template_utils.py         # Template processing
-│   ├── output_utils.py           # Output management
-│   ├── project_metadata.py       # Project metadata extraction
-│   ├── markdown_utils.py         # Markdown utilities
-│   └── templates/                # Built-in prompt templates
-│       ├── message_prompt.md
+│   ├── config.py                 # Hierarchical configuration management
+│   ├── constants.py              # Template constants and error codes
+│   ├── errors.py                 # Custom exception classes
+│   ├── main.py                   # Main entry point
+│   ├── commands/                 # Command implementations
+│   │   ├── __init__.py          # Command discovery and registration
+│   │   ├── base.py              # BaseCommand abstract class
+│   │   ├── message.py           # Commit message generation
+│   │   ├── changelog.py         # Changelog generation
+│   │   ├── release_notes.py     # Release notes generation
+│   │   ├── announcement.py      # Announcement generation
+│   │   ├── config.py            # Configuration management commands
+│   │   ├── init.py              # Project initialization
+│   │   └── version.py           # Version display
+│   ├── lib/                     # Core library modules
+│   │   ├── __init__.py
+│   │   ├── git.py               # Git operations and history
+│   │   ├── llm.py               # LLM client integration
+│   │   ├── templates.py         # Template engine and discovery
+│   │   ├── output.py            # Output management with modes
+│   │   ├── metadata.py          # Project metadata extraction
+│   │   ├── markdown.py          # Markdown processing utilities
+│   │   ├── repository.py        # Repository detection and analysis
+│   │   ├── summarization.py     # Content summarization
+│   │   ├── todo.py              # TODO scanning and analysis
+│   │   └── utils.py             # Common utilities
+│   └── templates/               # Built-in prompt templates
+│       ├── commit_message_prompt.md
 │       ├── changelog_prompt.md
 │       ├── release_notes_prompt.md
 │       └── announcement_prompt.md
-├── tests/                        # Test suite
+├── tests/                        # Comprehensive test suite
 ├── docs/                         # Documentation
-├── build/                        # Build scripts and configuration
-├── pyproject.toml               # Poetry configuration
-└── setup.py                    # Build automation
+├── build/                        # Build scripts and automation
+├── .github/workflows/            # GitHub Actions CI/CD
+├── pyproject.toml               # Poetry configuration with TestPyPI
+└── poetry.lock                  # Locked dependencies
+```
 
-### Build and Distribution
-
-The binary compilation process uses automated build scripts:
+### Build and Distribution Infrastructure
 
 ```
+.github/workflows/
+├── build.yml                     # Main CI workflow
+├── build-ci.yml                 # CI binary builds
+├── build-binaries.yml           # Production binary builds
+└── release.yml                  # Release automation
+
 build/
-├── build.py                      # Main build script
-├── pyinstaller_config.py         # PyInstaller configuration
-├── cross_compile.py              # Cross-platform compilation
-└── package_binaries.py           # Package for distribution
+├── build_binary.py              # Simple PyInstaller wrapper
+├── core/                        # Build utilities
+│   ├── config.py               # Build configuration
+│   ├── utils.py                # Build utilities
+│   └── version_manager.py      # Version management
+├── homebrew/                    # Homebrew tap generation
+│   ├── build.py               # Formula builder with --create-tap
+│   └── giv.rb                 # Formula template
+├── scoop/                       # Scoop bucket generation
+│   ├── build.py               # Manifest builder with --create-bucket
+│   └── giv.json               # Manifest template
+└── pypi/                        # PyPI package building
+    ├── build.py               # Package builder
+    └── setup.py               # Package metadata
 ```
-
-### Build Process Flow
-
-1. **Source Preparation**: Python source code and templates
-2. **Dependency Resolution**: Resolve all Python dependencies
-3. **Cross-Compilation**: Build for each target platform
-4. **Binary Optimization**: Strip unnecessary components
-5. **Package Creation**: Create distribution packages
-6. **Release Automation**: Upload to GitHub releases and package managers
 
 ### Configuration Management
 
-The `config.py` module implements Git-style configuration:
+The `config.py` module implements Git-style hierarchical configuration:
 
-- **File-based storage**: `.giv/config` in project root
-- **Environment variables**: `GIV_*` prefixed variables
-- **Command-line overrides**: CLI flags take precedence
+#### Configuration Sources (Priority Order)
+1. **Command-line arguments** (highest priority)
+2. **Environment variables** (`GIV_*` prefixed with dot-notation support)
+3. **Project configuration** (`.giv/config` in project root)
+4. **User configuration** (`~/.giv/config` in user home)
+5. **Built-in defaults** (lowest priority)
+
+#### Configuration Features
+- **File-based storage**: INI-style key=value format
+- **Environment variable mapping**: `api.key` → `GIV_API_KEY`
 - **Cross-platform paths**: Handles Windows/Unix path differences
-- **Validation**: Type checking and format validation
+- **Type validation**: Automatic type checking and conversion
+- **Template integration**: Configuration values available in templates
 
-### System Utilities
+### Template System
 
-**system.sh** provides logging functions (`print_debug`, `print_info`, etc.), temporary-dir management (`portable_mktemp_dir`, `remove_tmp_dir`), `.giv` directory initialization (`ensure_giv_dir_init`), and location helpers (`find_giv_dir`) ([system.sh][3]).
+The template engine supports multi-source template discovery:
 
-### Argument Parsing
+#### Template Discovery Order
+1. **Project templates**: `.giv/templates/` (highest priority)
+2. **User templates**: `~/.giv/templates/`
+3. **Built-in templates**: Bundled in binary (lowest priority)
 
-**args.sh** defines `show_help` and `parse_args`, mapping CLI options to `GIV_*` variables, validating revisions/pathspecs, handling config files early, and configuring local vs remote AI modes ([args.sh][4]).
+#### Template Features
+- **Variable substitution**: `{VARIABLE}` syntax with context
+- **Conditional rendering**: Template validation and error handling
+- **Built-in context**: Git data, metadata, configuration values
+- **Custom context**: Command-specific template variables
 
-### Markdown Handling
+### Error Handling and Exit Codes
 
-**markdown.sh** implements `manage_section` for append/prepend/update of Markdown sections, `append_link` to add links, utilities for stripping and normalizing Markdown (`strip_markdown`, `normalize_blank_lines`), and Markdown viewing via `glow` (with fallback to `cat` if unavailable) ([markdown.sh][5]).
+The system uses structured error handling with specific exit codes:
 
-### LLM Integration
+- **Exit 0**: Success
+- **Exit 1**: General errors (file not found, invalid arguments)
+- **Exit 2**: Template errors (missing template, template syntax)
+- **Exit 3**: Git errors (not a Git repository, Git command failures)
+- **Exit 4**: Configuration errors (invalid config, missing required values)
+- **Exit 5**: API errors (LLM API failures, network issues)
 
-**llm.py** handles JSON-escaping (`json_escape`), remote API calls (`generate_remote` via curl), local inference (`run_local`), response parsing (`extract_content_from_response`), and high-level `generate_response`, along with prompt token replacement (`replace_tokens`), prompt building (`build_prompt`), and execution (`generate_from_prompt`). It includes robust error handling and a fallback to `jq` for JSON parsing ([llm.sh][6]).
+### Build Process and Automation
 
-### Centralized Metadata Retrieval
+#### PyInstaller Integration
+The binary compilation uses a simplified PyInstaller approach:
 
-**project_metadata.sh** includes a centralized function, `get_metadata_value`, which retrieves metadata values (e.g., version, title) based on the project type. This function is used across scripts like `history.sh` and `llm.sh` to ensure consistent and modular metadata management. The project type is detected during initialization and stored in the configuration for runtime use.
+```python
+# build/build_binary.py - Auto-detection approach
+def get_binary_name():
+    """Get platform-specific binary name."""
+    system = platform.system().lower()
+    if system == "darwin":
+        system = "macos"  # Consistent naming
+    
+    machine = platform.machine().lower()
+    if machine in ("x86_64", "amd64"):
+        arch = "x86_64"
+    elif machine in ("aarch64", "arm64"):
+        arch = "arm64"
+    
+    binary_name = f"giv-{system}-{arch}"
+    if system == "windows":
+        binary_name += ".exe"
+    
+    return binary_name
+```
 
-### History Extraction
+#### GitHub Actions Build Matrix
+The automated build system uses platform-specific runners:
 
-**history.sh** provides utilities for summarizing Git history, extracting TODO changes, and caching summaries. It consolidates diff logic in a single `get_diff` function and ensures strict error handling and cleanup of temporary files ([history.sh][8]).
+```yaml
+# Full production matrix
+matrix:
+  include:
+    - platform: linux, arch: x86_64, runner: ubuntu-latest
+    - platform: linux, arch: arm64, runner: ubuntu-latest  # Cross-compilation
+    - platform: macos, arch: x86_64, runner: macos-13
+    - platform: macos, arch: arm64, runner: macos-latest
+    - platform: windows, arch: x86_64, runner: windows-latest
+```
 
-### Subcommand Implementations
+#### Cross-Compilation Support
+Linux ARM64 builds use cross-compilation toolchain:
 
-Each subcommand in the `giv` CLI is implemented as a separate `.sh` script located in the `src/commands/` folder. The main `giv.sh` script detects the subcommand and delegates execution to the corresponding script. The architecture has recently evolved to support a more generic and modular approach:
+```bash
+# Install cross-compilation tools
+sudo apt-get install -y gcc-aarch64-linux-gnu
 
-1. **Generic Document Driver (`document.sh`)**:
-   - Subcommands like `announcement.sh`, `release-notes.sh`, and `summary.sh` now act as thin wrappers that delegate their functionality to `document.sh`.
-   - These scripts pass specific templates (e.g., `announcement_prompt.md`, `release_notes_prompt.md`, `final_summary_prompt.md`) to `document.sh` for processing.
-   - The `document` subcommand itself allows arbitrary prompt files via `--prompt-file`, supporting custom document types and workflows.
+# Set environment variables
+export CC=aarch64-linux-gnu-gcc
+export CXX=aarch64-linux-gnu-g++
+export AR=aarch64-linux-gnu-ar
+export STRIP=aarch64-linux-gnu-strip
+```
 
-2. **Direct Implementations**:
-   - Scripts like `changelog.sh` and `message.sh` currently implement their logic directly, but there is an ongoing migration to unify all document-like subcommands under the generic driver for consistency and maintainability.
-   - These scripts handle argument parsing, Git history summarization, and AI prompt generation within the script.
+### Testing and Quality Assurance
 
-3. **Shared Functionality**:
-   - Common argument parsing and utility functions are provided by `document_args.sh` and other shared scripts. The new `parse_document_args` function is used for all document-related subcommands to ensure consistent flag handling (e.g., `--prompt-file`, `--project-type`).
+#### Automated Testing Strategy
+- **Unit tests**: pytest with coverage for all modules
+- **Integration tests**: End-to-end command testing
+- **Binary validation**: Automated testing of compiled binaries
+- **Cross-platform testing**: Matrix testing across all platforms
+- **Compatibility testing**: Multiple Python versions (3.8-3.12)
 
-4. **Execution Flow and Error Handling**:
-   - The main `giv.sh` script identifies the subcommand and executes the corresponding `.sh` file from the `commands` folder.
-   - If the subcommand script is not found, an error message is displayed with a list of available subcommands.
-   - All subcommands now include improved error handling: missing dependencies, invalid config, or failed AI calls are surfaced to the user with clear messages and exit codes. Optional dependencies (e.g., Glow, GitHub CLI) are checked at runtime, and warnings are issued if unavailable.
+#### Quality Gates
+- **Type checking**: mypy for static type validation
+- **Code formatting**: black for consistent code style
+- **Linting**: flake8 for code quality
+- **Security scanning**: Automated vulnerability detection
+- **Dependency verification**: Poetry lock file validation
 
-This modular structure ensures that each subcommand is self-contained and easy to maintain, while shared functionality is centralized for reuse. The ongoing migration aims to further unify subcommand logic and reduce duplication.
-## Testing and Error Handling
+## Distribution and Installation
 
-- The project includes an extensive test suite under `tests/`, covering all major workflows and edge cases. Tests are run in sandboxed environments to ensure reliability and portability.
-- Error handling is robust: missing dependencies, invalid config, or failed AI calls result in clear user-facing messages and non-zero exit codes. Warnings are issued for optional but recommended settings.
-- Users can opt for manual review before saving generated content, providing an additional layer of safety.
+### Installation Methods
+
+1. **GitHub Releases**: Direct binary downloads
+2. **PyPI**: Python package installation (`pip install giv`)
+3. **Homebrew**: macOS/Linux package manager (`brew install giv-cli/tap/giv`)
+4. **Scoop**: Windows package manager (`scoop install giv`)
+5. **Chocolatey**: Windows package manager (generated automatically)
+6. **Installation Script**: Cross-platform detection and installation
+
+### Release Automation
+
+The release process is fully automated through GitHub Actions:
+
+1. **Tag Creation**: Creates release workflows
+2. **Binary Building**: Parallel builds for all platforms
+3. **Package Generation**: Homebrew/Scoop/Chocolatey configurations
+4. **PyPI Publishing**: Automatic package publishing
+5. **GitHub Release**: Comprehensive release with all assets
+6. **Checksum Validation**: SHA256 checksums for all binaries
 
 ---
 
@@ -370,52 +489,97 @@ classDiagram
 
 ---
 
-## Sequence of `giv document --prompt-file <file> <range>`
+## Command Execution Flow
+
+The Python implementation follows a clean command pattern architecture:
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant giv.sh
-    participant args.sh
-    participant system.sh
-    participant history.sh
-    participant project_metadata.sh
-    participant llm.sh
-    participant markdown.sh
-    participant OutputFile as "DOCUMENT.md"
+    participant CLI
+    participant Command
+    participant Git
+    participant Template
+    participant LLM
+    participant Output
 
-    User->>giv.sh: "giv document --prompt-file templates/document_prompt.md  v1.2.0..HEAD"
-    alt First time after cloning
-        giv.sh->>system.sh: ensure_giv_dir_init()
-        system.sh-->>giv.sh: .giv/ dirs created
-    end
-    giv.sh->>args.sh: parse_args(...)
-    args.sh-->>giv.sh: set GIV_PROMPT_FILE, GIV_REV_RANGE, etc.
-
-    giv.sh->>history.sh: summarize_target("v1.2.0..HEAD")
-    history.sh->>history.sh: build_history("v1.2.0..HEAD")
-    history.sh->>project_metadata.sh: get_project_title()
-    project_metadata.sh-->>history.sh: "My Project"
-    history.sh->>project_metadata.sh: get_version_info("v1.2.0")
-    project_metadata.sh-->>history.sh: "1.2.0"
-
-    history.sh->>llm.sh: build_prompt(templates/document_prompt.md,history.md,title, version)
-    llm.sh-->>history.sh: fullPrompt
-    history.sh->>llm.sh: generate_response(fullPrompt)
-    llm.sh-->>history.sh: aiDocumentContent.md
-
-    history.sh-->>giv.sh: /tmp/giv_document_output.md
-    giv.sh->>markdown.sh: write_output(/tmp/giv_document_output.md,"DOCUMENT.md")
-    markdown.sh-->>giv.sh: DOCUMENT.md written
-
-    giv.sh->>OutputFile: display("DOCUMENT.md")
+    User->>CLI: giv message --staged
+    CLI->>Command: MessageCommand(args, config)
+    Command->>Git: get_diff(cached=True)
+    Git-->>Command: staged changes
+    Command->>Template: render(commit_message_prompt.md)
+    Template-->>Command: formatted prompt
+    Command->>LLM: generate_response(prompt)
+    LLM-->>Command: commit message
+    Command->>Output: write_output(message, mode)
+    Output-->>User: commit message displayed
 ```
 
-1. **Initialization** (once): creates `.giv/` directory.
-2. **Argument Parsing**: `args.sh` sets up global vars (prompt file, revision range).
-3. **History Extraction**: `history.sh` builds a unified history for the given range, invoking `project_metadata.sh` for title/version.
-4. **Prompt Assembly**: `llm.sh` merges the template, history, and metadata into a single prompt.
-5. **AI Generation**: same module calls out to remote/local LLM, returns the document text.
-6. **Output**: `markdown.sh` writes the result to `DOCUMENT.md` and the CLI presents it.
+### Command Lifecycle
 
-These diagrams and explanations should give you a clear map of **what data lives where** and **how the `document` flow unfolds** end-to-end.
+1. **Initialization**: CLI parses arguments and creates command instance
+2. **Context Building**: Command gathers Git history, metadata, and templates
+3. **Template Rendering**: Variables are substituted into template content
+4. **AI Generation**: LLM processes the prompt and generates content
+5. **Output Handling**: Results are written according to specified mode
+6. **Cleanup**: Temporary resources are cleaned up automatically
+
+### Data Flow Patterns
+
+- **Configuration**: Hierarchical loading (project → user → environment)
+- **Templates**: Discovery from multiple sources with precedence
+- **Git Integration**: Unified diff extraction with context preservation
+- **Error Propagation**: Structured exception handling with exit codes
+- **Output Management**: Flexible writing modes for different use cases
+
+## Error Handling and Resilience
+
+### Exception Hierarchy
+Custom exceptions provide clear error categorization:
+
+```python
+# giv/errors.py
+class GivError(Exception):
+    """Base exception class with exit codes."""
+    exit_code = 1
+
+class TemplateError(GivError):
+    exit_code = 2
+
+class GitError(GivError):
+    exit_code = 3
+
+class ConfigError(GivError):
+    exit_code = 4
+
+class APIError(GivError):
+    exit_code = 5
+```
+
+### Graceful Degradation
+- **Optional dependencies**: Graceful fallback when tools are unavailable
+- **Partial failures**: Continue operation when non-critical components fail
+- **User feedback**: Clear error messages with actionable guidance
+- **Recovery suggestions**: Automatic configuration repair when possible
+
+### Testing Strategy
+- **Comprehensive coverage**: Unit, integration, and compatibility tests
+- **Cross-platform validation**: Testing on Linux, macOS, and Windows
+- **Mock environments**: Isolated testing with dependency mocking
+- **Error simulation**: Systematic testing of failure scenarios
+
+## Performance Considerations
+
+### Binary Optimization
+- **Single-file deployment**: No runtime dependencies required
+- **Startup optimization**: Fast initialization for CLI responsiveness
+- **Memory efficiency**: Minimal resource usage for typical operations
+- **Caching strategies**: Template and configuration caching
+
+### Scalability
+- **Large repositories**: Efficient handling of extensive Git histories
+- **Concurrent operations**: Thread-safe operations where applicable
+- **Resource management**: Proper cleanup of temporary resources
+- **API rate limiting**: Intelligent handling of LLM API constraints
+
+This architecture provides a robust, maintainable, and user-friendly foundation for the giv CLI tool while ensuring cross-platform compatibility and reliable operation across diverse development environments.

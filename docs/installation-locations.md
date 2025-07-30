@@ -2,11 +2,32 @@
 
 This document describes where the giv CLI tool and its components are installed on different platforms and through different installation methods.
 
+## Binary Naming Convention
+
+All binaries follow a consistent naming pattern:
+```
+giv-{platform}-{arch}[.exe]
+
+Examples:
+- giv-linux-x86_64
+- giv-linux-arm64  
+- giv-macos-x86_64
+- giv-macos-arm64
+- giv-windows-x86_64.exe
+```
+
 ## Binary Distributions
 
 ### GitHub Releases (Direct Download)
 
 When you download binaries directly from GitHub releases, you can place them anywhere you prefer:
+
+**Available binaries:**
+- `giv-linux-x86_64` - Linux Intel/AMD 64-bit
+- `giv-linux-arm64` - Linux ARM 64-bit  
+- `giv-macos-x86_64` - macOS Intel
+- `giv-macos-arm64` - macOS Apple Silicon
+- `giv-windows-x86_64.exe` - Windows 64-bit
 
 **Recommended locations:**
 
@@ -18,8 +39,20 @@ Templates are bundled inside the binary using PyInstaller and are extracted at r
 
 **Example installation:**
 ```bash
-# Linux/macOS
+# Linux x86_64
 sudo curl -L -o /usr/local/bin/giv https://github.com/giv-cli/giv-py/releases/latest/download/giv-linux-x86_64
+sudo chmod +x /usr/local/bin/giv
+
+# Linux ARM64  
+sudo curl -L -o /usr/local/bin/giv https://github.com/giv-cli/giv-py/releases/latest/download/giv-linux-arm64
+sudo chmod +x /usr/local/bin/giv
+
+# macOS Intel
+sudo curl -L -o /usr/local/bin/giv https://github.com/giv-cli/giv-py/releases/latest/download/giv-macos-x86_64
+sudo chmod +x /usr/local/bin/giv
+
+# macOS Apple Silicon
+sudo curl -L -o /usr/local/bin/giv https://github.com/giv-cli/giv-py/releases/latest/download/giv-macos-arm64
 sudo chmod +x /usr/local/bin/giv
 
 # Or for user installation
@@ -45,6 +78,11 @@ When installed via PyPI, files are placed in the Python environment:
 
 ### Homebrew (macOS/Linux)
 
+**Installation command:**
+```bash
+brew install giv-cli/tap/giv
+```
+
 **Binary location:**
 - **macOS**: `/opt/homebrew/bin/giv` (Apple Silicon) or `/usr/local/bin/giv` (Intel)
 - **Linux**: `/home/linuxbrew/.linuxbrew/bin/giv`
@@ -52,12 +90,13 @@ When installed via PyPI, files are placed in the Python environment:
 **Template location:**
 Templates are bundled inside the binary (self-contained).
 
-**Installation:**
-```bash
-brew install giv-cli/tap/giv
-```
-
 ### Scoop (Windows)
+
+**Installation command:**
+```powershell
+scoop bucket add giv-cli https://github.com/giv-cli/scoop-bucket
+scoop install giv
+```
 
 **Binary location:**
 - **Windows**: `%USERPROFILE%\scoop\apps\giv\current\giv-windows-x86_64.exe`
@@ -66,11 +105,19 @@ brew install giv-cli/tap/giv
 **Template location:**
 Templates are bundled inside the binary (self-contained).
 
-**Installation:**
+### Chocolatey (Windows)
+
+**Installation command:**
 ```powershell
-scoop bucket add giv-cli https://github.com/giv-cli/scoop-bucket
-scoop install giv
+choco install giv
 ```
+
+**Binary location:**
+- **Windows**: `C:\ProgramData\chocolatey\bin\giv.exe`
+- **Actual binary**: `C:\ProgramData\chocolatey\lib\giv\tools\giv-windows-x86_64.exe`
+
+**Template location:**
+Templates are bundled inside the binary (self-contained).
 
 ## Configuration Files
 
@@ -104,7 +151,7 @@ mkdir -p .giv/templates
 cp -r $(python -c "import giv; print(giv.__path__[0])")/templates/* .giv/templates/
 
 # Edit templates
-nano .giv/templates/message_prompt.md
+nano .giv/templates/commit_message_prompt.md
 ```
 
 ### For Binary Installation
@@ -188,13 +235,40 @@ giv init
 python -c "import giv; print(giv.__file__)"
 ```
 
-### Permission denied
 ```bash
-# Make binary executable
+# Make binary executable (Linux/macOS)
 chmod +x /path/to/giv
 
-# Or fix ownership
+# Fix ownership if needed  
 sudo chown $USER:$USER /path/to/giv
+
+# Windows: Run as Administrator if needed
 ```
 
-This layout ensures that giv works consistently across all installation methods while providing the flexibility for users to customize templates and configuration as needed.
+### Package manager issues
+```bash
+# Homebrew: Update and retry
+brew update
+brew install giv-cli/tap/giv
+
+# Scoop: Refresh buckets
+scoop update
+scoop install giv
+
+# PyPI: Upgrade pip and retry
+pip install --upgrade pip
+pip install giv
+```
+
+## Summary
+
+The giv CLI provides multiple installation options to suit different preferences:
+
+- **GitHub Releases**: Platform-specific binaries for maximum portability
+- **PyPI**: Python package for development environments  
+- **Homebrew**: macOS/Linux package manager integration
+- **Scoop/Chocolatey**: Windows package manager support
+
+All methods provide the same core functionality with consistent configuration and template systems. Binary distributions are completely self-contained, while PyPI installations integrate with Python environments.
+
+Choose the installation method that best fits your workflow and platform preferences.
