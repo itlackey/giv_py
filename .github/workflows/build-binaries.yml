@@ -21,6 +21,10 @@ jobs:
             arch: x86_64
             runner: ubuntu-latest
             target: linux-x86_64
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-latest
+            target: linux-arm64
           - platform: macos
             arch: x86_64
             runner: macos-13
@@ -50,6 +54,10 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3-dev build-essential
+        # Install cross-compilation tools for ARM64
+        if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+        fi
     
     - name: Install Poetry
       uses: snok/install-poetry@v1
@@ -58,32 +66,17 @@ jobs:
         virtualenvs-create: true
         virtualenvs-in-project: true
 
-    - name: Configure Poetry PATH and verify
+    - name: Configure build environment
       shell: bash
       run: |
-        # Add potential Poetry paths to PATH
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          export PATH="$APPDATA/Python/Scripts:$PATH"
-          export PATH="$APPDATA/pypoetry/venv/Scripts:$PATH"
-          echo "$APPDATA/Python/Scripts" >> $GITHUB_PATH
-          echo "$APPDATA/pypoetry/venv/Scripts" >> $GITHUB_PATH
+        # Set cross-compilation environment for Linux ARM64
+        if [[ "${{ matrix.platform }}" == "linux" && "${{ matrix.arch }}" == "arm64" ]]; then
+          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+          echo "AR=aarch64-linux-gnu-ar" >> $GITHUB_ENV
+          echo "STRIP=aarch64-linux-gnu-strip" >> $GITHUB_ENV
         fi
         
-        # Try to find poetry
-        which poetry || echo "Poetry not found in PATH"
-        poetry --version || echo "Poetry version check failed"
-        
-        # If poetry still not found, try pip install as fallback
-        if ! command -v poetry &> /dev/null; then
-          echo "Installing Poetry via pip as fallback..."
-          python -m pip install --user poetry
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            export PATH="$HOME/.local/bin:$PATH"
-            echo "$HOME/.local/bin" >> $GITHUB_PATH
-          fi
-        fi
-        
-        # Final verification
         poetry --version
         poetry config virtualenvs.create true
         poetry config virtualenvs.in-project true
@@ -100,22 +93,46 @@ jobs:
       shell: bash
       run: poetry run build-binary
     
-    - name: Test binary (Linux/macOS)
-      if: matrix.platform != 'windows'
+    - name: Test binary
+      shell: bash
       run: |
-        chmod +x dist/giv-${{ matrix.target }}
-        ./dist/giv-${{ matrix.target }} --version
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          BINARY_PATH="dist/giv-${{ matrix.target }}.exe"
+        else
+          BINARY_PATH="dist/giv-${{ matrix.target }}"
+          chmod +x "$BINARY_PATH"
+        fi
+        
+        # Test binary exists and is executable
+        if [[ ! -f "$BINARY_PATH" ]]; then
+          echo "ERROR: Binary not found at $BINARY_PATH"
+          ls -la dist/
+          exit 1
+        fi
+        
+        # Basic functionality test (skip for cross-compiled ARM64)
+        if [[ "${{ matrix.arch }}" != "arm64" || "${{ matrix.platform }}" != "linux" ]]; then
+          "$BINARY_PATH" --version
+        else
+          echo "Skipping execution test for cross-compiled ARM64 binary"
+        fi
     
-    - name: Test binary (Windows)
-      if: matrix.platform == 'windows'
+    - name: Generate checksums
+      shell: bash
       run: |
-        ./dist/giv-${{ matrix.target }}.exe --version
+        cd dist
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          sha256sum "giv-${{ matrix.target }}.exe" > "giv-${{ matrix.target }}.exe.sha256"
+        else
+          sha256sum "giv-${{ matrix.target }}" > "giv-${{ matrix.target }}.sha256"
+        fi
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: giv-${{ matrix.target }}
-        path: dist/giv-${{ matrix.target }}*
+        path: |
+          dist/giv-${{ matrix.target }}*
         retention-days: 30
     
     - name: Create release (on tag)

@@ -123,6 +123,124 @@ class ScoopBuilder:
             print(f"ERROR: Manifest validation failed: {e}")
             return False
 
+    def create_bucket_structure(self, version: Optional[str] = None, output_dir: Optional[Path] = None) -> Path:
+        """
+        Create Scoop bucket directory structure.
+        
+        Args:
+            version: Version string (auto-detected if not provided)
+            output_dir: Output directory (defaults to dist/)
+            
+        Returns:
+            Path to bucket directory
+        """
+        if version is None:
+            version = self.version_manager.get_build_version()
+        
+        if output_dir is None:
+            output_dir = self.config.dist_dir / version
+        
+        # Create bucket structure: scoop-bucket/bucket/
+        bucket_dir = output_dir / "scoop-bucket" / "bucket"
+        ensure_dir(bucket_dir)
+        
+        # Build and place manifest in bucket structure
+        self.build_manifest(version, bucket_dir)
+        
+        # Create README for bucket
+        readme_content = f"""# Scoop Bucket for giv CLI
+
+This is the official Scoop bucket for giv CLI version {version}.
+
+## Installation
+
+```powershell
+scoop bucket add giv-cli https://github.com/giv-cli/scoop-bucket
+scoop install giv
+```
+
+## Updating
+
+```powershell
+scoop update
+scoop update giv
+```
+"""
+        readme_path = bucket_dir.parent / "README.md"
+        readme_path.write_text(readme_content)
+        
+        print(f"Created Scoop bucket structure at: {bucket_dir.parent}")
+        return bucket_dir.parent
+
+    def create_chocolatey_package(self, version: Optional[str] = None, output_dir: Optional[Path] = None) -> Path:
+        """
+        Create Chocolatey package structure.
+        
+        Args:
+            version: Version string (auto-detected if not provided)
+            output_dir: Output directory (defaults to dist/)
+            
+        Returns:
+            Path to chocolatey directory
+        """
+        if version is None:
+            version = self.version_manager.get_build_version()
+        
+        if output_dir is None:
+            output_dir = self.config.dist_dir / version
+        
+        # Create chocolatey structure
+        choco_dir = output_dir / "chocolatey"
+        tools_dir = choco_dir / "tools"
+        ensure_dir(tools_dir)
+        
+        # Create basic chocolatey files
+        nuspec_content = f"""<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>giv</id>
+    <version>{version}</version>
+    <packageSourceUrl>https://github.com/giv-cli/giv-py</packageSourceUrl>
+    <owners>giv-cli</owners>
+    <title>giv CLI</title>
+    <authors>giv Development Team</authors>
+    <projectUrl>https://github.com/giv-cli/giv-py</projectUrl>
+    <description>Intelligent Git commit message and changelog generator powered by AI</description>
+    <summary>AI-powered Git history assistant</summary>
+    <tags>git commit ai changelog cli</tags>
+    <licenseUrl>https://github.com/giv-cli/giv-py/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  </metadata>
+  <files>
+    <file src="tools\\**" target="tools" />
+  </files>
+</package>"""
+        
+        install_script = f"""$ErrorActionPreference = 'Stop'
+$packageName = 'giv'
+$toolsDir = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
+$url64 = 'https://github.com/giv-cli/giv-py/releases/download/v{version}/giv-windows-x86_64.exe'
+
+$packageArgs = @{{
+  packageName   = $packageName
+  unzipLocation = $toolsDir
+  fileType      = 'exe'
+  url64bit      = $url64
+  softwareName  = 'giv*'
+  checksum64    = 'CHECKSUM_PLACEHOLDER'
+  checksumType64= 'sha256'
+  validExitCodes= @(0)
+}}
+
+Install-ChocolateyPackage @packageArgs
+"""
+        
+        (choco_dir / f"giv.{version}.nuspec").write_text(nuspec_content)
+        (tools_dir / "chocolateyinstall.ps1").write_text(install_script)
+        
+        print(f"Created Chocolatey package structure at: {choco_dir}")
+        return choco_dir
+
 
 def main():
     """CLI interface for Scoop builder."""
@@ -132,11 +250,29 @@ def main():
     parser.add_argument("--version", help="Version to build (auto-detected if not provided)")
     parser.add_argument("--output-dir", type=Path, help="Output directory for manifest")
     parser.add_argument("--validate", action="store_true", help="Validate manifest only")
+    parser.add_argument("--create-bucket", action="store_true", help="Create Scoop bucket structure")
+    parser.add_argument("--chocolatey", action="store_true", help="Also create Chocolatey package")
     
     args = parser.parse_args()
     
     try:
         builder = ScoopBuilder()
+        
+        if args.create_bucket:
+            # Create Scoop bucket structure
+            bucket_dir = builder.create_bucket_structure(args.version, args.output_dir)
+            if args.chocolatey:
+                choco_dir = builder.create_chocolatey_package(args.version, args.output_dir)
+                print("SUCCESS: Scoop bucket and Chocolatey package created")
+            else:
+                print(f"SUCCESS: Scoop bucket created at {bucket_dir}")
+            return
+        
+        if args.chocolatey:
+            # Create Chocolatey package only
+            choco_dir = builder.create_chocolatey_package(args.version, args.output_dir)
+            print(f"SUCCESS: Chocolatey package created at {choco_dir}")
+            return
         
         if args.validate:
             # Find existing manifest to validate

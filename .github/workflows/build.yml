@@ -9,12 +9,22 @@ on:
       - main
 
 jobs:
-  build:
+  test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.11"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        # Test fewer platform combinations to speed up CI
+        exclude:
+          - os: macos-latest
+            python-version: "3.8"
+          - os: macos-latest  
+            python-version: "3.9"
+          - os: windows-latest
+            python-version: "3.8"
+          - os: windows-latest
+            python-version: "3.9"
 
     steps:
       - uses: actions/checkout@v4
@@ -27,37 +37,13 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: "1.8.3"
+          version: 'latest'
           virtualenvs-create: true
           virtualenvs-in-project: true
-          installer-parallel: true
-          
-      - name: Configure Poetry PATH and verify
+
+      - name: Configure build environment
         shell: bash
         run: |
-          # Add potential Poetry paths to PATH
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            export PATH="$APPDATA/Python/Scripts:$PATH"
-            export PATH="$APPDATA/pypoetry/venv/Scripts:$PATH"
-            echo "$APPDATA/Python/Scripts" >> $GITHUB_PATH
-            echo "$APPDATA/pypoetry/venv/Scripts" >> $GITHUB_PATH
-          fi
-          
-          # Try to find poetry
-          which poetry || echo "Poetry not found in PATH"
-          poetry --version || echo "Poetry version check failed"
-          
-          # If poetry still not found, try pip install as fallback
-          if ! command -v poetry &> /dev/null; then
-            echo "Installing Poetry via pip as fallback..."
-            python -m pip install --user poetry
-            if [[ "$RUNNER_OS" == "Windows" ]]; then
-              export PATH="$HOME/.local/bin:$PATH"
-              echo "$HOME/.local/bin" >> $GITHUB_PATH
-            fi
-          fi
-          
-          # Final verification
           poetry --version
           poetry config virtualenvs.create true
           poetry config virtualenvs.in-project true
@@ -88,22 +74,7 @@ jobs:
         shell: bash
         run: poetry run pytest -q
 
-      - name: Test binary build
-        shell: bash
-        run: |
-          poetry run build-binary
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            ./dist/giv-windows-x86_64.exe --version
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            chmod +x dist/giv-macos-*
-            ./dist/giv-macos-* --version
-          else
-            chmod +x dist/giv-linux-x86_64
-            ./dist/giv-linux-x86_64 --version
-          fi
-
-      - name: Archive artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: giv-${{ matrix.os }}-test
-          path: dist/giv-*
+  build-binaries:
+    uses: ./.github/workflows/build-ci.yml
+    with:
+      cache_dependencies: true
