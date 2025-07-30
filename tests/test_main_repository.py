@@ -54,7 +54,7 @@ class TestMainRepositoryBehavior:
         try:
             # Start from nested subdirectory
             os.chdir(subdir)
-            assert Path.cwd() == subdir  # Verify we're in subdirectory
+            assert Path.cwd().resolve() == subdir.resolve()  # Verify we're in subdirectory
             
             # Run giv command - should work and change to repo root
             exit_code = main(["--dry-run", "message"])
@@ -63,7 +63,7 @@ class TestMainRepositoryBehavior:
             assert exit_code == 0
             
             # Should have changed to repository root
-            assert Path.cwd() == Path(git_repo).resolve()
+            assert Path.cwd().resolve() == Path(git_repo).resolve()
             
         finally:
             os.chdir(original_cwd)

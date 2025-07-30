@@ -99,7 +99,7 @@ class TestRepositoryValidation:
             
             # Verify we're now in the repository root
             assert repo_root == Path(git_repo).resolve()
-            assert Path.cwd() == Path(git_repo).resolve()
+            assert Path.cwd().resolve() == Path(git_repo).resolve()
             
         finally:
             os.chdir(original_cwd)
@@ -195,7 +195,7 @@ class TestRepositoryIntegration:
                 
                 # Test validate_and_change_to_repo_root
                 validate_and_change_to_repo_root()
-                assert Path.cwd() == repo_root.resolve()
+                assert Path.cwd().resolve() == repo_root.resolve()
                 
             finally:
                 os.chdir(original_cwd)
