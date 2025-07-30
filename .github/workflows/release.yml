@@ -120,14 +120,36 @@ jobs:
           VERSION="${{ github.event.inputs.version }}"
         fi
         
-        mkdir -p dist/$VERSION
+        echo "Organizing artifacts for version: $VERSION"
+        echo "Downloaded artifacts:"
+        ls -la artifacts/
         
-        # Copy binaries to expected locations
+        # Create dist directory for binaries (what build scripts expect)
+        mkdir -p dist
+        
+        # Copy binaries to dist/ directory (flat structure expected by build scripts)
+        for artifact_dir in artifacts/giv-*; do
+          if [[ -d "$artifact_dir" ]]; then
+            echo "Processing artifact directory: $artifact_dir"
+            ls -la "$artifact_dir/"
+            
+            # Copy all files from artifact directory to dist/
+            cp "$artifact_dir"/* dist/
+          fi
+        done
+        
+        echo "Final dist/ contents:"
+        ls -la dist/
+        
+        # Also create versioned directory structure for release assets
+        mkdir -p "dist/$VERSION"
+        
+        # Copy binaries to versioned structure as well
         for artifact_dir in artifacts/giv-*; do
           if [[ -d "$artifact_dir" ]]; then
             target=$(basename "$artifact_dir" | sed 's/^giv-//')
             
-            # Handle platform naming consistency
+            # Handle platform naming consistency for release organization
             case "$target" in
               "macos-x86_64")
                 platform="darwin"

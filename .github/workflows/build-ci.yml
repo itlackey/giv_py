@@ -45,9 +45,9 @@ jobs:
         sudo apt-get install -y python3-dev build-essential
     
     - name: Install Poetry
-      uses: snok/install-poetry@v1
+      uses: snok/install-poetry@v1.4.1
       with:
-        version: 'latest'
+        version: latest
         virtualenvs-create: true
         virtualenvs-in-project: true
 
