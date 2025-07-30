@@ -15,6 +15,11 @@ on:
         required: false
         type: boolean
         default: true
+      publish_test_pypi:
+        description: 'Publish to Test PyPI'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-binaries:
@@ -54,7 +59,7 @@ jobs:
         retention-days: 30
     
     - name: Publish to Test PyPI
-      if: contains(github.ref, '-') || github.event_name == 'workflow_dispatch'
+      if: contains(github.ref, '-') || github.event_name == 'workflow_dispatch' && github.event.inputs.publish_test_pypi == 'true'
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}

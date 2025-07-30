@@ -93,22 +93,81 @@ jobs:
       shell: bash
       run: poetry run build-binary
     
+    - name: Rename binary to match target
+      shell: bash
+      run: |
+        echo "Contents of dist/ after build:"
+        ls -la dist/
+        
+        # Find the binary that was actually created
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          BUILT_BINARY=$(find dist/ -name "giv-*.exe" -type f | head -1)
+          TARGET_BINARY="dist/giv-${{ matrix.target }}.exe"
+        else
+          BUILT_BINARY=$(find dist/ -name "giv-*" -type f -not -name "*.sha256" | head -1)
+          TARGET_BINARY="dist/giv-${{ matrix.target }}"
+        fi
+        
+        if [[ -z "$BUILT_BINARY" ]]; then
+          echo "ERROR: No binary found after build"
+          exit 1
+        fi
+        
+        echo "Found built binary: $BUILT_BINARY"
+        echo "Target binary name: $TARGET_BINARY"
+        
+        # Rename if different
+        if [[ "$BUILT_BINARY" != "$TARGET_BINARY" ]]; then
+          echo "Renaming binary to match target"
+          mv "$BUILT_BINARY" "$TARGET_BINARY"
+        fi
+        
+        echo "Final contents of dist/:"
+        ls -la dist/
+    
     - name: Test binary
       shell: bash
       run: |
+        echo "Matrix target: ${{ matrix.target }}"
+        echo "Matrix platform: ${{ matrix.platform }}"
+        echo "Contents of dist/:"
+        ls -la dist/
+        
+        # Find the actual binary that was created
         if [[ "${{ matrix.platform }}" == "windows" ]]; then
-          BINARY_PATH="dist/giv-${{ matrix.target }}.exe"
+          EXPECTED_BINARY="dist/giv-${{ matrix.target }}.exe"
         else
-          BINARY_PATH="dist/giv-${{ matrix.target }}"
+          EXPECTED_BINARY="dist/giv-${{ matrix.target }}"
+        fi
+        
+        echo "Looking for expected binary: $EXPECTED_BINARY"
+        
+        # Check if expected binary exists
+        if [[ -f "$EXPECTED_BINARY" ]]; then
+          BINARY_PATH="$EXPECTED_BINARY"
+        else
+          # Try to find any giv binary in dist/
+          echo "Expected binary not found, looking for any giv binary..."
+          BINARY_PATH=$(find dist/ -name "giv-*" -type f | head -1)
+          if [[ -z "$BINARY_PATH" ]]; then
+            echo "ERROR: No giv binary found in dist/"
+            exit 1
+          fi
+          echo "Found binary: $BINARY_PATH"
+        fi
+        
+        # Make executable if not Windows
+        if [[ "${{ matrix.platform }}" != "windows" ]]; then
           chmod +x "$BINARY_PATH"
         fi
         
         # Test binary exists and is executable
         if [[ ! -f "$BINARY_PATH" ]]; then
           echo "ERROR: Binary not found at $BINARY_PATH"
-          ls -la dist/
           exit 1
         fi
+        
+        echo "Testing binary: $BINARY_PATH"
         
         # Basic functionality test (skip for cross-compiled ARM64)
         if [[ "${{ matrix.arch }}" != "arm64" || "${{ matrix.platform }}" != "linux" ]]; then
@@ -121,6 +180,9 @@ jobs:
       shell: bash
       run: |
         cd dist
+        echo "Contents of dist/:"
+        ls -la
+        
         # Use cross-platform checksum command
         if command -v sha256sum >/dev/null 2>&1; then
           CHECKSUM_CMD="sha256sum"
@@ -131,11 +193,31 @@ jobs:
           exit 1
         fi
         
+        # Find the binary that was created and generate checksum
         if [[ "${{ matrix.platform }}" == "windows" ]]; then
-          $CHECKSUM_CMD "giv-${{ matrix.target }}.exe" > "giv-${{ matrix.target }}.exe.sha256"
+          EXPECTED_BINARY="giv-${{ matrix.target }}.exe"
         else
-          $CHECKSUM_CMD "giv-${{ matrix.target }}" > "giv-${{ matrix.target }}.sha256"
+          EXPECTED_BINARY="giv-${{ matrix.target }}"
         fi
+        
+        if [[ -f "$EXPECTED_BINARY" ]]; then
+          echo "Generating checksum for: $EXPECTED_BINARY"
+          $CHECKSUM_CMD "$EXPECTED_BINARY" > "$EXPECTED_BINARY.sha256"
+        else
+          # Find any giv binary and generate checksum
+          BINARY_FILE=$(find . -name "giv-*" -type f -not -name "*.sha256" | head -1)
+          if [[ -n "$BINARY_FILE" ]]; then
+            BINARY_FILE=${BINARY_FILE#./}  # Remove leading ./
+            echo "Generating checksum for found binary: $BINARY_FILE"
+            $CHECKSUM_CMD "$BINARY_FILE" > "$BINARY_FILE.sha256"
+          else
+            echo "ERROR: No binary found to generate checksum"
+            exit 1
+          fi
+        fi
+        
+        echo "Generated checksums:"
+        ls -la *.sha256
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
