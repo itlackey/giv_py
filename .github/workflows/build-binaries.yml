@@ -48,7 +48,7 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libpython3.11-dev
+        sudo apt-get install -y python3.11-dev
     
     - name: Install Poetry
       uses: snok/install-poetry@v1
