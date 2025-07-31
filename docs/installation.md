@@ -29,8 +29,8 @@ Download the latest binary for your platform from the [releases page](https://gi
 
 - **Linux (x86_64)**: `giv-linux-x86_64`
 - **Linux (ARM64)**: `giv-linux-arm64`
-- **macOS (Intel)**: `giv-darwin-x86_64`
-- **macOS (Apple Silicon)**: `giv-darwin-arm64`
+- **macOS (Intel)**: `giv-macos-x86_64`
+- **macOS (Apple Silicon)**: `giv-macos-arm64`
 - **Windows (x86_64)**: `giv-windows-x86_64.exe`
 
 ### Install Manually

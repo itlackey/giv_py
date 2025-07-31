@@ -178,7 +178,7 @@ The template engine supports multi-source template discovery:
 3. **Built-in templates**: Bundled in binary (lowest priority)
 
 #### Template Features
-- **Variable substitution**: `{VARIABLE}` syntax with context
+- **Variable substitution**: `[VARIABLE]` syntax with context
 - **Conditional rendering**: Template validation and error handling
 - **Built-in context**: Git data, metadata, configuration values
 - **Custom context**: Command-specific template variables

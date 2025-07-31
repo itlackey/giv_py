@@ -46,13 +46,16 @@ The following configuration keys are available:
 | Key                  | Purpose                                             | Example Value                                 |
 |----------------------|-----------------------------------------------------|-----------------------------------------------|
 | `api.url`            | API endpoint URL                                    | `https://api.openai.com/v1/chat/completions` |
-| `api.model`          | AI model name                                       | `gpt-4o-mini`, `devstral`, `compound-beta`    |
+| `api.model`          | AI model name                                       | `gpt-4o-mini`, `llama3.2`, `claude-3-sonnet` |
+| `api.key`            | API key (use environment variables)                | `OPENAI_API_KEY` (env var name)               |
 | `project.title`      | Project name                                        | `My Awesome Project`                          |
 | `project.description`| Project description                                 | `A CLI tool for managing projects`           |
 | `project.url`        | Project URL                                         | `https://github.com/user/project`            |
 | `project.type`       | Project type (auto-detected)                       | `node`, `python`, `rust`, `custom`           |
-| `project.version_file`| File containing version information                | `package.json`, `pyproject.toml`             |
-| `project.version_pattern`| Regex pattern to extract version              | `"version":\s*"([^"]+)"`                     |
+| `version.file`       | File containing version information                 | `package.json`, `pyproject.toml`             |
+| `version.pattern`    | Regex pattern to extract version                   | `"version":\s*"([^"]+)"`                     |
+| `output.mode`        | Default output mode                                 | `auto`, `append`, `prepend`, `overwrite`     |
+| `changelog.file`     | Changelog file path                                 | `CHANGELOG.md`                                |
 | `temperature`        | AI model temperature (0.0-1.0)                     | `0.7`                                         |
 | `max_tokens`         | Maximum tokens for AI response                      | `8192`                                        |
 
@@ -69,9 +72,13 @@ Configuration values are stored as `GIV_*` environment variables and can be over
 | `GIV_PROJECT_DESCRIPTION` | Project description                             | `project.description`|
 | `GIV_PROJECT_URL`     | Project URL                                         | `project.url`        |
 | `GIV_PROJECT_TYPE`    | Project type                                        | `project.type`       |
-| `GIV_PROJECT_VERSION_FILE` | Version file path                              | `project.version_file`|
-| `GIV_PROJECT_VERSION_PATTERN` | Version extraction pattern               | `project.version_pattern`|
+| `GIV_VERSION_FILE`    | Version file path                                   | `version.file`       |
+| `GIV_VERSION_PATTERN` | Version extraction pattern                          | `version.pattern`    |
+| `GIV_OUTPUT_MODE`     | Default output mode                                 | `output.mode`        |
+| `GIV_CHANGELOG_FILE`  | Changelog file path                                 | `changelog.file`     |
 | `GIV_CONFIG_FILE`     | Path to configuration file                          | N/A                  |
+
+**Preferred API Key Variables**: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GIV_API_KEY`
 
 You can also use a `.env` file in your project root to set these variables. The configuration hierarchy is:
 1. Command-line arguments (highest priority)
@@ -101,14 +108,31 @@ GIV_API_MODEL=gpt-4o-mini
 ```bash
 giv config set api.url "https://api.openai.com/v1/chat/completions"
 giv config set api.model "gpt-4o-mini"
-giv config set api.key "your_openai_api_key_here"
+# Set API key via environment variable
+export OPENAI_API_KEY="your_openai_api_key_here"
+```
+
+### Anthropic Claude Setup
+```bash
+giv config set api.url "https://api.anthropic.com/v1/messages"
+giv config set api.model "claude-3-5-sonnet-20241022"
+# Set API key via environment variable
+export ANTHROPIC_API_KEY="your_anthropic_api_key_here"
 ```
 
 ### Groq Setup
 ```bash
 giv config set api.url "https://api.groq.com/openai/v1/chat/completions"
-giv config set api.model "compound-beta"
-giv config set api.key "your_groq_api_key_here"
+giv config set api.model "llama3-70b-8192"
+# Set API key via environment variable
+export GROQ_API_KEY="your_groq_api_key_here"
+```
+
+### Local Ollama Setup
+```bash
+giv config set api.url "http://localhost:11434/v1/chat/completions"
+giv config set api.model "llama3.2"
+# No API key needed for localhost
 ```
 
 ### Cross-Platform Configuration
@@ -152,9 +176,9 @@ giv summary --config-file ./prod.env
 
 You can override auto-detection:
 ```bash
-giv config project.type "custom"
-giv config project.version_file "VERSION.txt"  
-giv config project.version_pattern "([0-9]+\.[0-9]+\.[0-9]+)"
+giv config set project.type "custom"
+giv config set version.file "VERSION.txt"  
+giv config set version.pattern "([0-9]+\.[0-9]+\.[0-9]+)"
 ```
 
 ## Prompt Templates

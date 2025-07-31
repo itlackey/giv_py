@@ -269,20 +269,20 @@ output.mode=auto
 - `announcement_prompt.md`: Marketing announcements
 
 ### 5.3 Template Variables
-Templates support variable substitution with `{VARIABLE}` syntax:
+Templates support variable substitution with `[VARIABLE]` syntax:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `{HISTORY}` |Git diff content | Unified diff output used in commit message and commit summary |
-| `{SUMMARY}` | LLM generated summary of Git diff content | Produced for given revision |
-| `{PROJECT_TITLE}` | Project name | "My Application" |
-| `{VERSION}` | Version string | "1.2.0" |
-| `{COMMIT_ID}` | Full commit hash | "a1b2c3d4..." |
-| `{SHORT_COMMIT_ID}` | Abbreviated hash | "a1b2c3d" |
-| `{BRANCH}` | Current Git branch | "main" |
-| `{DATE}` | Commit or current date | "2024-01-15" |
-| `{MESSAGE}` | Commit message | "Fix authentication bug" |
-| `{AUTHOR}`   | Git user name for the commit |
+| `[HISTORY]` |Git diff content | Unified diff output used in commit message and commit summary |
+| `[SUMMARY]` | LLM generated summary of Git diff content | Produced for given revision |
+| `[PROJECT_TITLE]` | Project name | "My Application" |
+| `[VERSION]` | Version string | "1.2.0" |
+| `[COMMIT_ID]` | Full commit hash | "a1b2c3d4..." |
+| `[SHORT_COMMIT_ID]` | Abbreviated hash | "a1b2c3d" |
+| `[BRANCH]` | Current Git branch | "main" |
+| `[DATE]` | Commit or current date | "2024-01-15" |
+| `[MESSAGE]` | Commit message | "Fix authentication bug" |
+| `[AUTHOR]`   | Git user name for the commit |
 
 ## 6. Git Integration
 
