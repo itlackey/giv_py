@@ -64,9 +64,79 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 | `--version-pattern <regex>` | Regex pattern for version extraction | SemVer default |
 | `--version <version>` | Version string for versioned content, defaults to auto-detected | `auto` |
 
-## 3. Subcommands
+## 3. Usage Examples
 
-### 3.1 Message Command (Default)
+### 3.1 Basic Commands
+```bash
+# Generate commit message for current changes
+giv message
+
+# Generate message for specific revision range
+giv message HEAD~3..HEAD
+
+# Generate message for staged changes only
+giv message --cached
+
+# Create a project summary
+giv summary v1.0.0..HEAD
+
+# Generate changelog entry
+giv changelog v1.0.0..HEAD --output-file CHANGELOG.md
+
+# Create release notes
+giv release-notes v1.2.0..HEAD --output-file RELEASE_NOTES.md
+```
+
+### 3.2 Advanced Usage
+```bash
+# Filter by file patterns
+giv message HEAD~1..HEAD src/ docs/
+
+# Scan for TODOs in specific files
+giv changelog --todo-files '*.py' --todo-pattern 'TODO|FIXME|XXX'
+
+# Use custom templates
+giv message --prompt-file my-template.md
+
+# Different output modes
+giv changelog --output-mode append    # Add to end
+giv changelog --output-mode prepend   # Add to beginning  
+giv changelog --output-mode update    # Replace existing section
+```
+
+### 3.3 Configuration Management
+```bash
+# List all configuration
+giv config list
+
+# Set API configuration
+giv config set api.url "https://api.openai.com/v1/chat/completions"
+giv config set api.model "gpt-4"
+
+# Set project metadata
+giv config set project.title "My Project"
+giv config set output.mode "auto"
+
+# Remove configuration
+giv config unset old.setting
+```
+
+### 3.4 Template Customization
+```bash
+# Initialize project templates (copies defaults to .giv/templates/)
+giv init
+
+# Edit templates
+nano .giv/templates/commit_message_prompt.md
+nano .giv/templates/changelog_prompt.md
+
+# Use custom template for one command
+giv message --prompt-file custom-prompt.md
+```
+
+## 4. Subcommands
+
+### 4.1 Message Command (Default)
 **Usage**: `giv [global options] [message] [revision] [pathspec...] [command options]`
 
 **Purpose**: Generate commit messages from Git diffs
@@ -88,7 +158,7 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 - Includes summary line and detailed description
 - References specific files and changes when relevant
 
-### 3.2 Summary Command
+### 4.2 Summary Command
 **Usage**: `giv [options] summary [revision] [pathspec...] [command options]`
 
 **Purpose**: Create comprehensive technical summaries of changes
@@ -103,7 +173,7 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 - Structured sections covering different aspects of changes
 - Professional tone suitable for technical documentation
 
-### 3.3 Changelog Command
+### 4.3 Changelog Command
 **Usage**: `giv [options] changelog [revision] [pathspec...] [command options]`
 
 **Purpose**: Generate or update changelog files following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standard
@@ -131,7 +201,7 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 - Bug fix descriptions
 ```
 
-### 3.4 Release Notes Command
+### 4.4 Release Notes Command
 **Usage**: `giv [options] release-notes [revision] [pathspec...] [command options]`
 
 **Purpose**: Generate professional release notes for tagged releases
@@ -146,7 +216,7 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 
 **Output**: Professional release notes with version highlights and changes
 
-### 3.5 Announcement Command
+### 4.5 Announcement Command
 **Usage**: `giv [options] announcement [revision] [pathspec...] [command options]`
 
 **Purpose**: Create marketing-style announcements and public communications
@@ -161,7 +231,7 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 
 **Output**: Engaging announcement content with marketing focus
 
-### 3.6 Document Command
+### 4.6 Document Command
 **Usage**: `giv [options] document [revision] [pathspec...] --prompt-file <template> [command options]`
 
 **Purpose**: Generate custom content using user-provided templates
@@ -177,7 +247,7 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 
 **Default Output File**: `{VERSION}_document.md`
 
-### 3.7 Config Command
+### 4.7 Config Command
 **Usage**: `giv config <operation> [key] [value]`
 - CLI options/args matches `git config` for configuration operations
 
@@ -207,7 +277,7 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 - `output.mode`: Default output mode
 - `changelog.file`: Changelog file path
 
-### 3.8 Init Command
+### 4.8 Init Command
 **Usage**: `giv init`
 
 **Purpose**: Initialize giv configuration and templates in project
@@ -218,22 +288,22 @@ giv [global-options] <command> [revision] [pathspec...] [command-options]
 - Prompts for basic configuration values
 - Sets up project-local configuration
 
-### 3.9 Utility Commands
+### 4.9 Utility Commands
 - `giv version`: Display version information
 - `giv help [command]`: Show help information
 - `giv available-releases`: List available releases
 - `giv update [version]`: Self-update to latest or specific version
 
-## 4. Configuration System
+## 5. Configuration System
 
-### 4.1 Configuration Hierarchy (precedence from highest to lowest)
+### 5.1 Configuration Hierarchy (precedence from highest to lowest)
 1. **Command-line arguments**: Override all other settings
 2. **Project configuration**: `.giv/config` in project root
 3. **User configuration**: `~/.giv/config` in home directory  
 4. **Environment variables**: `GIV_*` prefixed (e.g., `GIV_API_KEY`)
 5. **Built-in defaults**: Application defaults
 
-### 4.2 Configuration File Format
+### 5.2 Configuration File Format
 ```ini
 # Key-value pairs with dot notation
 api.url=https://api.openai.com/v1/chat/completions
@@ -246,21 +316,21 @@ changelog.file=CHANGELOG.md
 output.mode=auto
 ```
 
-### 4.3 Environment Variable Mapping
+### 5.3 Environment Variable Mapping
 - Configuration keys convert to uppercase with `GIV_` prefix
 - Dots become underscores: `api.key` → `GIV_API_KEY`
 - Supports quoted values for special characters
 - **Preferred API key variables**: `OPENAI_API_KEY`, `GIV_API_KEY`
 - **Security**: API keys should only be provided via environment variables, not stored in configuration files
 
-## 5. Template System
+## 6. Template System
 
-### 5.1 Template Hierarchy (precedence from highest to lowest)
+### 6.1 Template Hierarchy (precedence from highest to lowest)
 1. **Custom template**: Specified via `--prompt-file`
 2. **Project templates**: `.giv/templates/` directory
 3. **System templates**: Bundled with application
 
-### 5.2 Built-in Templates
+### 6.2 Built-in Templates
 - `commit_message_prompt.md`: Commit message generation
 - `commit_summary_prompt.md`: Commit summary generation
 - `summary_prompt.md`: Technical summaries
@@ -268,7 +338,7 @@ output.mode=auto
 - `release_notes_prompt.md`: Release documentation
 - `announcement_prompt.md`: Marketing announcements
 
-### 5.3 Template Variables
+### 6.3 Template Variables
 Templates support variable substitution with `[VARIABLE]` syntax:
 
 | Variable | Description | Example |
@@ -284,15 +354,15 @@ Templates support variable substitution with `[VARIABLE]` syntax:
 | `[MESSAGE]` | Commit message | "Fix authentication bug" |
 | `[AUTHOR]`   | Git user name for the commit |
 
-## 6. Git Integration
+## 7. Git Integration
 
-### 6.1 Repository Requirements and Initialization
+### 7.1 Repository Requirements and Initialization
 - **Repository Detection**: Application uses `git rev-parse --show-toplevel` to find repository root
 - **Automatic Root Navigation**: Changes working directory to repository root on startup
 - **Repository Validation**: Exits with error if not executed from within a Git repository
 - **Consistent Operation**: All file paths and operations are relative to repository root
 
-### 6.2 Revision Support
+### 7.2 Revision Support
 - **Full Git syntax**: Supports all gitrevisions formats
 - **Revision ranges**: `v1.0.0..HEAD`, `HEAD~3..HEAD`, `branch1..branch2`
 - **Special revisions**:
@@ -300,14 +370,14 @@ Templates support variable substitution with `[VARIABLE]` syntax:
   - `--cached`: Staged changes only
 - **Path specifications**: Limit analysis to specific files/directories
 
-### 6.3 Repository Analysis
+### 7.3 Repository Analysis
 - **Diff extraction**: Generates unified diffs for AI analysis
 - **Metadata collection**: Commit hashes, dates, messages, authors
 - **Branch detection**: Current branch identification
 - **Status checking**: Working tree and index status
 - **Untracked files**: Includes new files in analysis
 
-### 6.4 Project Metadata Detection
+### 7.4 Project Metadata Detection
 Automatically detects project information from:
 
 | Project Type | Files | Metadata Extracted |
@@ -328,9 +398,9 @@ Automatically detects project information from:
 - Pre-release suffixes (1.2.3-beta, 1.2.3-alpha.1)
 - **Conflict Resolution**: Determined by project type setting; prompts user if project type unset
 
-## 7. Output Management
+## 8. Output Management
 
-### 7.1 Output Modes
+### 8.1 Output Modes
 - **`auto`**: Intelligent mode selection:
   - Changelog command: `update` or `prepend` if the section is missing
   - Release notes command: `overwrite`
@@ -342,21 +412,21 @@ Automatically detects project information from:
 - **`overwrite`**: Replace entire file content
 - **`none`**: Output to stdout only
 
-### 7.2 File Handling
+### 8.2 File Handling
 - **Section management**: Version-aware updates for structured files
 - **Format preservation**: Maintains existing file structure and formatting
 - **Encoding**: UTF-8 encoding throughout application
 - **Output Linting**: All output should pass basic markdown linting
 
-## 8. AI Provider Support
+## 9. AI Provider Support
 
-### 8.1 Supported API Types
+### 9.1 Supported API Types
 - **OpenAI**
 - **Anthropic**  
 - **Local models**: Ollama and other OpenAI-compatible endpoints
 - **Custom APIs**: Any service implementing OpenAI ChatCompletion format
 
-### 8.2 API Configuration Examples
+### 9.2 API Configuration Examples
 ```bash
 # OpenAI Configuration
 giv config set api.url "https://api.openai.com/v1/chat/completions"
@@ -374,7 +444,7 @@ giv config set api.model "llama3.2"
 # No API key needed for localhost
 ```
 
-### 8.3 Model Parameters
+### 9.3 Model Parameters
 - **Temperature**: Controls creativity/randomness (0.0-2.0)
   - Creative commands (message, summary): 0.9 default
   - Factual commands (changelog, release-notes): 0.7 default
@@ -382,27 +452,27 @@ giv config set api.model "llama3.2"
 - **Timeout**: Request timeout in seconds (default: 60)
 - **Retries**: Automatic retry attempts on failure (default: 3, then exit)
 
-## 9. Advanced Features
+## 10. Advanced Features
 
-### 9.1 TODO Scanning
+### 10.1 TODO Scanning
 - **Pattern matching**: Custom regex via `--todo-pattern`
 - **File filtering**: Specific files via `--todo-files`
 - **Integration**: TODO items included in generated content
 - **Default patterns**: Matches `TODO`, `FIXME`, `ADD` comments
 
-### 9.2 Version Management
+### 10.2 Version Management
 - **Automatic detection**: Extracts versions from project files or based on `--version-file` 
 - **SemVer support**: Semantic versioning parsing and validation
 - **Custom patterns**: User-defined version regex patterns
 - **Manual override**: Explicit version specification via `--version`
 
-### 9.3 Dry Run Mode
+### 10.3 Dry Run Mode
 - **Prompt generation**: Shows what would be sent to the LLM
 - **No API calls**: Skips actual LLM requests, uses prompt as output
 - **Output simulation**: Displays where content would be written
 - **Configuration testing**: Validates settings without side effects
 
-## 10. Error Handling and Validation
+## 11. Error Handling and Validation
 
 ### 10.1 Comprehensive Error Management
 - **Configuration validation**: Detects invalid or missing settings
@@ -422,7 +492,7 @@ giv config set api.model "llama3.2"
 - **UTF-8 encoding**: Default character encoding throughout application
 - **Basic Markdown**: Supports standard Markdown formatting without extensions
 
-## 11. Installation and Distribution
+## 12. Installation and Distribution
 
 ### 11.1 Installation Methods
 1. **Binary distribution**: Self-contained executables (~15MB)
@@ -446,7 +516,7 @@ giv config set api.model "llama3.2"
 - **Version checking**: `giv available-releases` lists available versions
 - **Binary replacement**: Downloads and replaces current executable
 
-## 12. Business Rules and Requirements
+## 13. Business Rules and Requirements
 
 ### 12.0 Workflow
 **Application Initialization**:
@@ -512,7 +582,7 @@ giv config set api.model "llama3.2"
 4. **Must support CI/CD integration** through environment variables
 5. **Must manage team configuration** via `.giv/config` files in repositories
 
-## 13. Security and Extensibility
+## 14. Security and Extensibility
 
 ### 13.1 Authentication and Security
 - **API Key Management**: API keys must only be provided via environment variables (`OPENAI_API_KEY`, `GIV_API_KEY`)

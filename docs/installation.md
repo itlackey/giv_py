@@ -7,8 +7,21 @@
 
 > **Note:** giv is distributed as compiled binaries with no runtime dependencies.
 
+## Installation Methods Comparison
+
+Choose the method that best fits your needs:
+
+| Method | Size | Dependencies | Auto-updates | Platform Support |
+|--------|------|--------------|--------------|------------------|
+| Direct Download | ~15MB | None | Manual | Linux, macOS, Windows |
+| Installation Script | ~15MB | None | Manual | Linux, macOS, Windows |
+| Homebrew | ~15MB | None | `brew upgrade` | macOS, Linux |
+| Scoop | ~15MB | None | `scoop update` | Windows |
+| PyPI | ~500KB | Python 3.8.1+ | `pip install -U` | Cross-platform |
+
 ## Quick Install (Recommended)
 
+### Installation Script
 Install the latest version using the installation script:
 
 ```bash
@@ -20,6 +33,21 @@ This script will:
 - Download the appropriate binary
 - Install it to a directory in your PATH
 - Set up the necessary permissions
+
+### Direct Download
+```bash
+# Linux x86_64
+curl -L -o giv https://github.com/giv-cli/giv-py/releases/latest/download/giv-linux-x86_64
+chmod +x giv && sudo mv giv /usr/local/bin/
+
+# macOS Apple Silicon  
+curl -L -o giv https://github.com/giv-cli/giv-py/releases/latest/download/giv-macos-arm64
+chmod +x giv && sudo mv giv /usr/local/bin/
+
+# Windows x86_64
+curl -L -o giv.exe https://github.com/giv-cli/giv-py/releases/latest/download/giv-windows-x86_64.exe
+# Move to a directory in your PATH
+```
 
 ## Manual Installation
 
@@ -116,6 +144,100 @@ giv init
 This will create a `.giv/config` file and prompt you for configuration values like API keys and project settings.
 
 ## After Installation
+
+## After Installation
+
+### First Run
+
+Once installed, initialize giv in your project:
+
+```bash
+# Verify installation
+giv --version
+
+# Initialize giv in your project
+giv init
+
+# Configure your AI provider (optional for dry-run testing)
+giv config set api.key "your-api-key"
+giv config set api.url "https://api.openai.com/v1/chat/completions"
+
+# Generate your first commit message
+giv message --dry-run  # Test without API call
+giv message            # Generate actual message
+```
+
+### Basic Usage Examples
+
+```bash
+# Generate commit message for current changes
+giv message
+
+# Generate message for specific revision range
+giv message HEAD~3..HEAD
+
+# Generate message for staged changes only
+giv message --cached
+
+# Create a project summary
+giv summary v1.0.0..HEAD
+
+# Generate changelog entry
+giv changelog v1.0.0..HEAD --output-file CHANGELOG.md
+
+# Create release notes
+giv release-notes v1.2.0..HEAD --output-file RELEASE_NOTES.md
+```
+
+**For detailed usage and advanced examples, see [App Specification](app-spec.md).**
+
+## Troubleshooting
+
+### Common Installation Issues
+
+#### Binary not found
+```bash
+# Check if installation directory is in PATH
+echo $PATH
+
+# Add to PATH (bash/zsh)
+echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### Permission denied
+```bash
+# Make binary executable
+chmod +x /path/to/giv
+
+# Or install to user directory
+mkdir -p ~/.local/bin
+mv giv ~/.local/bin/
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+#### Template errors
+```bash
+# Initialize templates in project
+giv init
+
+# Check template access
+giv message --dry-run
+```
+
+### Platform-Specific Issues
+
+#### macOS
+- **Gatekeeper warning**: Run `xattr -d com.apple.quarantine /path/to/giv` to remove quarantine
+- **Permission issues**: Use `brew install` instead of manual installation
+
+#### Windows
+- **Execution policy**: Run `Set-ExecutionPolicy RemoteSigned` in PowerShell as Administrator
+- **PATH not updated**: Restart terminal or add manually through System Properties
+
+#### Linux
+- **Permission denied**: Ensure binary is executable and in a directory with execute permissions
+- **Missing dependencies**: All dependencies are statically linked, no additional packages needed
 
 Verify the installation:
 

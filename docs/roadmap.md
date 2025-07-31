@@ -31,9 +31,9 @@ This document outlines planned features and improvements for the GIV CLI tool.
 ## Template System Enhancements
 
 ### Priority: Medium
-- **Rules files**: `--rules-file` parameter for custom content generation rules (`{RULES}` token)
-- **Example extraction**: `--example-file` with "auto" mode to extract examples from existing files (`{EXAMPLE}` token)
-- **Sample content**: `{SAMPLE}` token to provide current or previous section content for consistency
+- **Rules files**: `--rules-file` parameter for custom content generation rules (`[RULES]` token)
+- **Example extraction**: `--example-file` with "auto" mode to extract examples from existing files (`[EXAMPLE]` token)
+- **Sample content**: `[SAMPLE]` token to provide current or previous section content for consistency
 
 ## User Interface and Experience
 
